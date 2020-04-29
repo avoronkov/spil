@@ -82,7 +82,7 @@ func (i *Interpret) evalExpr(e Expr) (Expr, error) {
 				}
 				return &Sexpr{Quoted: true}, nil
 			}
-			if name == "func" {
+			if name == "func" || name == "def" {
 				if err := i.defineFunc(a.Tail()); err != nil {
 					return nil, err
 				}

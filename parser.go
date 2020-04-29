@@ -120,7 +120,7 @@ func (p *Parser) prepareTokens() error {
 		return io.EOF
 	}
 	line := strings.TrimSpace(p.scanner.Text())
-	if line == "" || line[0] == '#' {
+	if line == "" || line[0] == '#' || line[0] == ';' {
 		return p.prepareTokens()
 	}
 
