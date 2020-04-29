@@ -6,6 +6,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 var (
@@ -122,35 +123,61 @@ func (p *Parser) prepareTokens() error {
 	if line == "" || line[0] == '#' {
 		return p.prepareTokens()
 	}
-	fields := strings.Fields(line)
+
+	var token string
 	var tokens []string
-	for _, field := range fields {
-		tokens = append(tokens, p.splitField(field)...)
+	inQuotes := false
+	backslash := false
+	for _, r := range line {
+		if unicode.IsSpace(r) {
+			if inQuotes {
+				token += string(r)
+			} else if token != "" {
+				tokens = append(tokens, token)
+				token = ""
+			}
+		} else if r == '(' {
+			if token == "'" {
+				tokens = append(tokens, "'(")
+			} else if token != "" {
+				tokens = append(tokens, token, "(")
+			} else {
+				tokens = append(tokens, "(")
+			}
+			token = ""
+		} else if r == ')' {
+			if token != "" {
+				tokens = append(tokens, token)
+				token = ""
+			}
+			tokens = append(tokens, ")")
+		} else if r == '"' {
+			if !inQuotes {
+				token += string(r)
+				inQuotes = true
+			} else if backslash {
+				token += `\"`
+				backslash = false
+			} else {
+				token += string(r)
+				inQuotes = false
+				tokens = append(tokens, token)
+				token = ""
+			}
+		} else if r == '\\' {
+			if backslash {
+				token += `\\`
+				backslash = false
+			} else {
+				backslash = true
+			}
+		} else {
+			token += string(r)
+		}
+	}
+	if token != "" {
+		tokens = append(tokens, token)
 	}
 	p.tokens = tokens
 	return nil
-}
-
-// '(foo' -> '(', 'foo'
-// 'foo)' -> 'foo', ')'
-// '(foo)' -> '(', 'foo', ')'
-// `'(x` -> `'(`, `x`
-func (p *Parser) splitField(field string) (tokens []string) {
-	if strings.HasPrefix(field, "(") {
-		tokens = append(tokens, "(")
-		field = field[1:]
-	} else if strings.HasPrefix(field, "'(") {
-		tokens = append(tokens, "'(")
-		field = field[2:]
-	}
-	if strings.HasSuffix(field, ")") {
-		if len(field) > 1 {
-			tokens = append(tokens, field[:len(field)-1], ")")
-		} else {
-			tokens = append(tokens, ")")
-		}
-	} else if len(field) > 0 {
-		tokens = append(tokens, field)
-	}
-	return
 }
