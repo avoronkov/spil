@@ -24,7 +24,11 @@ func (i Int) Repr() string {
 type Str string
 
 func (s Str) String() string {
-	return string(s)
+	str := string(s)
+	str = strings.ReplaceAll(str, `\"`, `"`)
+	str = strings.ReplaceAll(str, `\\`, `\`)
+	str = strings.ReplaceAll(str, `\n`, "\n")
+	return str
 }
 
 func (s Str) Repr() string {
