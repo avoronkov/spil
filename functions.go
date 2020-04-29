@@ -1,18 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type Func func([]Expr) (Expr, error)
-
-var Funcs = map[string]Func{
-	"print": FPrint,
-	"+":     FPlus,
-	"-":     FMinus,
-	"*":     FMultiply,
-	"<":     FLess,
-	"=":     FEq,
-	"not":   FNot,
-}
 
 func FPrint(args []Expr) (Expr, error) {
 	for i, e := range args {
@@ -128,4 +120,26 @@ func FNot(args []Expr) (Expr, error) {
 		return nil, fmt.Errorf("FNot: expected argument to be Bool, found %v", args[0].Repr())
 	}
 	return Bool(!bool(a)), nil
+}
+
+func FHead(args []Expr) (Expr, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("FHead: expected 1 argument, found %v", args)
+	}
+	a, ok := args[0].(*Sexpr)
+	if !ok {
+		return nil, fmt.Errorf("FHead: expected argument to be List, found %v", args[0].Repr())
+	}
+	return a.Head(), nil
+}
+
+func FTail(args []Expr) (Expr, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("FTail: expected 1 argument, found %v", args)
+	}
+	a, ok := args[0].(*Sexpr)
+	if !ok {
+		return nil, fmt.Errorf("FTail: expected argument to be List, found %v", args[0].Repr())
+	}
+	return a.Tail(), nil
 }

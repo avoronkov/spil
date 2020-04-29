@@ -19,7 +19,7 @@ func main() {
 		input = os.Stdin
 	}
 
-	in := NewInterpreter(input)
+	in := NewInterpreter(input, os.Stdout)
 	if err := in.Run(); err != nil {
 		log.Fatal(err)
 	}

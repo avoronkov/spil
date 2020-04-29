@@ -2,9 +2,14 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"io"
 	"strconv"
 	"strings"
+)
+
+var (
+	UnexpectedEOF = errors.New("Unexpected EOF")
 )
 
 type Parser struct {
@@ -54,6 +59,9 @@ func (p *Parser) nextSexpr() (*Sexpr, error) {
 	var list []Expr
 	for {
 		token, err := p.nextToken()
+		if err == io.EOF {
+			return nil, UnexpectedEOF
+		}
 		if err != nil {
 			return nil, err
 		}

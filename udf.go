@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 )
 
 // User-defined functions
@@ -47,7 +46,7 @@ func (f *FuncInterpet) Bind(args []Expr) (*FuncRuntime, error) {
 	}
 	switch a := f.argfmt.(type) {
 	case Ident:
-		fr.vars[string(a)] = &Sexpr{List: args}
+		fr.vars[string(a)] = &Sexpr{List: args, Quoted: true}
 	case *Sexpr:
 		if l := a.Len(); l != len(args) {
 			return nil, fmt.Errorf("Incorrect number of arguments to %v: expected %v, found %v", f.name, l, len(args))
@@ -158,10 +157,6 @@ func (f *FuncRuntime) evalFunc(se *Sexpr) (Expr, error) {
 	if !ok {
 		return nil, fmt.Errorf("Wanted identifier, found: %v", head)
 	}
-	log.Printf("f: %v", f)
-	log.Printf("f.fi: %v", f.fi)
-	log.Printf("f.fi.interpret: %v", f.fi.interpret)
-	log.Printf("f.fi.interpret.funcs: %v", f.fi.interpret.funcs)
 	if fu, ok := f.fi.interpret.funcs[string(name)]; ok {
 		// evaluate arguments
 		tail := se.Tail()
@@ -180,7 +175,7 @@ func (f *FuncRuntime) evalFunc(se *Sexpr) (Expr, error) {
 		return fr.Eval()
 
 	}
-	fn, ok := Funcs[string(name)]
+	fn, ok := f.fi.interpret.deffuncs[string(name)]
 	if !ok {
 		return nil, fmt.Errorf("Unknown function: %v", name)
 	}

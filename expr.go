@@ -92,6 +92,17 @@ func (s *Sexpr) Repr() string {
 	return b.String()
 }
 
+// Mostly for equality of lists regardless of quoting.
+func (s *Sexpr) ReprNoQuotes() string {
+	b := &strings.Builder{}
+	fmt.Fprintf(b, "{S:")
+	for _, item := range s.List {
+		fmt.Fprintf(b, " %v", item.Repr())
+	}
+	fmt.Fprintf(b, "}")
+	return b.String()
+}
+
 func (s *Sexpr) Len() int {
 	return len(s.List)
 }

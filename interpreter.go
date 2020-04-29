@@ -6,17 +6,32 @@ import (
 )
 
 type Interpret struct {
-	parser *Parser
-	vars   map[string]Expr
-	funcs  map[string]*FuncInterpet
+	parser   *Parser
+	output   io.Writer
+	vars     map[string]Expr
+	deffuncs map[string]Func
+	funcs    map[string]*FuncInterpet
 }
 
-func NewInterpreter(r io.Reader) *Interpret {
-	return &Interpret{
+func NewInterpreter(r io.Reader, w io.Writer) *Interpret {
+	i := &Interpret{
 		parser: NewParser(r),
+		output: w,
 		vars:   make(map[string]Expr),
 		funcs:  make(map[string]*FuncInterpet),
 	}
+	i.deffuncs = map[string]Func{
+		"+":     FPlus,
+		"-":     FMinus,
+		"*":     FMultiply,
+		"<":     FLess,
+		"=":     FEq,
+		"not":   FNot,
+		"print": i.FPrint,
+		"head":  FHead,
+		"tail":  FTail,
+	}
+	return i
 }
 
 func (i *Interpret) Run() error {
@@ -24,6 +39,9 @@ func (i *Interpret) Run() error {
 		expr, err := i.parser.NextExpr()
 		if err == io.EOF {
 			break
+		}
+		if err != nil {
+			return err
 		}
 		_, err = i.evalExpr(expr)
 		if err != nil {
@@ -122,7 +140,7 @@ func (i *Interpret) evalFunc(se *Sexpr) (Expr, error) {
 		}
 		return fr.Eval()
 	}
-	fn, ok := Funcs[string(name)]
+	fn, ok := i.deffuncs[string(name)]
 	if !ok {
 		return nil, fmt.Errorf("Unknown function: %v", name)
 	}
@@ -173,4 +191,15 @@ func (i *Interpret) defineFunc(se *Sexpr) error {
 	}
 	i.funcs[string(name)] = fi
 	return nil
+}
+
+func (in *Interpret) FPrint(args []Expr) (Expr, error) {
+	for i, e := range args {
+		if i > 0 {
+			fmt.Fprintf(in.output, " ")
+		}
+		fmt.Fprintf(in.output, "%v", e.String())
+	}
+	fmt.Fprintf(in.output, "\n")
+	return &Sexpr{Quoted: true}, nil
 }
