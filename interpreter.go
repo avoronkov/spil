@@ -8,14 +8,14 @@ import (
 type Interpret struct {
 	parser *Parser
 	vars   map[string]Expr
-	funcs  map[string]Func
+	funcs  map[string]*FuncInterpet
 }
 
 func NewInterpreter(r io.Reader) *Interpret {
 	return &Interpret{
 		parser: NewParser(r),
 		vars:   make(map[string]Expr),
-		funcs:  make(map[string]Func),
+		funcs:  make(map[string]*FuncInterpet),
 	}
 }
 
@@ -64,6 +64,12 @@ func (i *Interpret) evalExpr(e Expr) (Expr, error) {
 				}
 				return &Sexpr{Quoted: true}, nil
 			}
+			if name == "func" {
+				if err := i.defineFunc(a.Tail()); err != nil {
+					return nil, err
+				}
+				return &Sexpr{Quoted: true}, nil
+			}
 		}
 
 		return i.evalFunc(a)
@@ -98,6 +104,23 @@ func (i *Interpret) evalFunc(se *Sexpr) (Expr, error) {
 	name, ok := head.(Ident)
 	if !ok {
 		return nil, fmt.Errorf("Wanted identifier, found: %v", head)
+	}
+	if fu, ok := i.funcs[string(name)]; ok {
+		// evaluate arguments
+		tail := se.Tail()
+		args := make([]Expr, 0, len(tail.List))
+		for _, arg := range tail.List {
+			res, err := i.evalExpr(arg)
+			if err != nil {
+				return nil, err
+			}
+			args = append(args, res)
+		}
+		fr, err := fu.Bind(args)
+		if err != nil {
+			return nil, err
+		}
+		return fr.Eval()
 	}
 	fn, ok := Funcs[string(name)]
 	if !ok {
@@ -134,6 +157,20 @@ func (i *Interpret) setVar(se *Sexpr) error {
 	return nil
 }
 
+// (func-name) args body...
 func (i *Interpret) defineFunc(se *Sexpr) error {
-	return fmt.Errorf("Not implemented yet")
+	if se.Len() < 3 {
+		return fmt.Errorf("Not enough arguments for function definition: %v", se.Repr())
+	}
+	name, ok := se.List[0].(Ident)
+	if !ok {
+		return fmt.Errorf("func expected identifier first, found %v", se.List[0].Repr())
+	}
+
+	fi, err := NewFuncInterpret(i, string(name), se.List[1], se.List[2:])
+	if err != nil {
+		return err
+	}
+	i.funcs[string(name)] = fi
+	return nil
 }
