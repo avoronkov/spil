@@ -21,15 +21,18 @@ func NewInterpreter(r io.Reader, w io.Writer) *Interpret {
 		funcs:  make(map[string]*FuncInterpet),
 	}
 	i.deffuncs = map[string]Func{
-		"+":     FPlus,
-		"-":     FMinus,
-		"*":     FMultiply,
-		"<":     FLess,
-		"=":     FEq,
-		"not":   FNot,
-		"print": i.FPrint,
-		"head":  FHead,
-		"tail":  FTail,
+		"+":      FPlus,
+		"-":      FMinus,
+		"*":      FMultiply,
+		"/":      FDiv,
+		"<":      FLess,
+		">":      FMore,
+		"=":      FEq,
+		"not":    FNot,
+		"print":  i.FPrint,
+		"head":   FHead,
+		"tail":   FTail,
+		"append": FAppend,
 	}
 	return i
 }

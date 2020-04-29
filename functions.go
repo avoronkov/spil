@@ -46,6 +46,21 @@ func FMultiply(args []Expr) (Expr, error) {
 	return Int(result), nil
 }
 
+func FDiv(args []Expr) (Expr, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("FDiv: expected 2 arguments, found %v", args)
+	}
+	a, ok := args[0].(Int)
+	if !ok {
+		return nil, fmt.Errorf("FLess: first argument should be integer, found %v", args[0].Repr())
+	}
+	b, ok := args[1].(Int)
+	if !ok {
+		return nil, fmt.Errorf("FLess: second argument should be integer, found %v", args[1].Repr())
+	}
+	return Int(a / b), nil
+}
+
 func FLess(args []Expr) (Expr, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("FLess: expected 2 arguments, found %v", args)
@@ -59,6 +74,21 @@ func FLess(args []Expr) (Expr, error) {
 		return nil, fmt.Errorf("FLess: second argument should be integer, found %v", args[1].Repr())
 	}
 	return Bool(a < b), nil
+}
+
+func FMore(args []Expr) (Expr, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("FMore: expected 2 arguments, found %v", args)
+	}
+	a, ok := args[0].(Int)
+	if !ok {
+		return nil, fmt.Errorf("FMore: first argument should be integer, found %v", args[0].Repr())
+	}
+	b, ok := args[1].(Int)
+	if !ok {
+		return nil, fmt.Errorf("FMore: second argument should be integer, found %v", args[1].Repr())
+	}
+	return Bool(a > b), nil
 }
 
 func FEq(args []Expr) (Expr, error) {
@@ -131,4 +161,21 @@ func FTail(args []Expr) (Expr, error) {
 		return nil, fmt.Errorf("FTail: expected argument to be List, found %v", args[0].Repr())
 	}
 	return a.Tail(), nil
+}
+
+func FAppend(args []Expr) (Expr, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("FAppend: expected at least 2 arguments, found %v", args)
+	}
+	l, ok := args[0].(*Sexpr)
+	if !ok {
+		return nil, fmt.Errorf("FAppend: expected first argument to be List, found %v", args[0].Repr())
+	}
+	newList := make([]Expr, len(l.List))
+	copy(newList, l.List)
+	newList = append(newList, args[1:]...)
+	return &Sexpr{
+		List:   newList,
+		Quoted: l.Quoted,
+	}, nil
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -11,14 +10,14 @@ type Expr interface {
 	Repr() string
 }
 
-type Int int
+type Int int64
 
 func (i Int) String() string {
-	return strconv.Itoa(int(i))
+	return fmt.Sprintf("%d", int64(i))
 }
 
 func (i Int) Repr() string {
-	return fmt.Sprintf("{Int: %d}", int(i))
+	return fmt.Sprintf("{Int: %d}", int64(i))
 }
 
 type Str string
