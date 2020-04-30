@@ -74,8 +74,11 @@ func (s *Sexpr) String() string {
 	} else {
 		fmt.Fprintf(b, "(")
 	}
-	for _, item := range s.List {
-		fmt.Fprintf(b, " %v", item.String())
+	for i, item := range s.List {
+		if i != 0 {
+			fmt.Fprintf(b, " ")
+		}
+		fmt.Fprintf(b, "%v", item)
 	}
 	fmt.Fprintf(b, ")")
 	return b.String()

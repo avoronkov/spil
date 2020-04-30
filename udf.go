@@ -38,32 +38,11 @@ func NewFuncInterpret(i *Interpret, name string, argfmt Expr, body []Expr) (*Fun
 }
 
 func (f *FuncInterpret) Eval(args []Expr) (Expr, error) {
-	run, err := f.bind(args)
-	if err != nil {
+	run := NewFuncRuntime(f)
+	if err := run.bind(args); err != nil {
 		return nil, err
 	}
 	return run.Eval()
-}
-
-// Evaluate function with specified arguments
-func (f *FuncInterpret) bind(args []Expr) (*FuncRuntime, error) {
-	fr := &FuncRuntime{
-		fi:   f,
-		vars: make(map[string]Expr),
-	}
-	switch a := f.argfmt.(type) {
-	case Ident:
-		fr.vars[string(a)] = &Sexpr{List: args, Quoted: true}
-	case *Sexpr:
-		if l := a.Len(); l != len(args) {
-			return nil, fmt.Errorf("Incorrect number of arguments to %v: expected %v, found %v", f.name, l, len(args))
-		}
-		for i, ident := range a.List {
-			name := string(ident.(Ident))
-			fr.vars[name] = args[i]
-		}
-	}
-	return fr, nil
 }
 
 type FuncRuntime struct {
@@ -71,14 +50,131 @@ type FuncRuntime struct {
 	vars map[string]Expr
 }
 
+func NewFuncRuntime(fi *FuncInterpret) *FuncRuntime {
+	return &FuncRuntime{
+		fi: fi,
+	}
+}
+
+func (f *FuncRuntime) bind(args []Expr) error {
+	f.vars = make(map[string]Expr)
+	switch a := f.fi.argfmt.(type) {
+	case Ident:
+		f.vars[string(a)] = &Sexpr{List: args, Quoted: true}
+	case *Sexpr:
+		if l := a.Len(); l != len(args) {
+			return fmt.Errorf("Incorrect number of arguments to %v: expected %v, found %v", f.fi.name, l, len(args))
+		}
+		for i, ident := range a.List {
+			name := string(ident.(Ident))
+			f.vars[name] = args[i]
+		}
+	}
+	return nil
+}
+
 func (f *FuncRuntime) Eval() (res Expr, err error) {
-	for _, expr := range f.fi.body {
-		res, err = f.evalExpr(expr)
-		if err != nil {
-			return nil, err
+	last := len(f.fi.body) - 1
+L:
+	for {
+		for i, expr := range f.fi.body {
+			if i == last {
+				// check for tail call
+				e, err := f.lastExpr(expr)
+				if err != nil {
+					return nil, err
+				}
+				lst, ok := e.(*Sexpr)
+				if !ok {
+					// nothing to evaluate
+					return e, nil
+				}
+				if lst.Quoted || lst.Len() == 0 {
+					return lst, nil
+				}
+				head := lst.Head()
+				hident, ok := head.(Ident)
+				if !ok || string(hident) != f.fi.name {
+					return f.evalFunc(lst)
+				}
+				// Tail call!
+				tail := lst.Tail()
+				// eval args
+				args := make([]Expr, 0, len(tail.List))
+				for _, ar := range tail.List {
+					arg, err := f.evalExpr(ar)
+					if err != nil {
+						return nil, err
+					}
+					args = append(args, arg)
+				}
+				if err := f.bind(args); err != nil {
+					return nil, err
+				}
+				continue L
+			} else {
+				res, err = f.evalExpr(expr)
+				if err != nil {
+					return nil, err
+				}
+			}
 		}
 	}
 	return
+}
+
+func (f *FuncRuntime) lastExpr(e Expr) (Expr, error) {
+	switch a := e.(type) {
+	case Int:
+		return a, nil
+	case Str:
+		return a, nil
+	case Bool:
+		return a, nil
+	case Ident:
+		if value, ok := f.vars[string(a)]; ok {
+			return value, nil
+		}
+		return a, nil
+	case *Sexpr:
+		if a.Quoted {
+			return a, nil
+		}
+		if a.Len() == 0 {
+			return nil, fmt.Errorf("Unexpected empty s-expression: %v", a)
+		}
+		head := a.Head()
+		if name, ok := head.(Ident); ok {
+			if name == "if" {
+				if len(a.List) != 4 {
+					return nil, fmt.Errorf("Expected 3 arguments to if, found: %v", a.Tail())
+				}
+				arg := a.List[1]
+				res, err := f.evalExpr(arg)
+				if err != nil {
+					return nil, err
+				}
+				boolRes, ok := res.(Bool)
+				if !ok {
+					return nil, fmt.Errorf("Argument %v should evaluate to boolean value, actual %v", arg, res)
+				}
+				if bool(boolRes) {
+					return f.lastExpr(a.List[2])
+				}
+				return f.lastExpr(a.List[3])
+			}
+			if name == "set" {
+				if err := f.setVar(a.Tail()); err != nil {
+					return nil, err
+				}
+				return &Sexpr{Quoted: true}, nil
+			}
+		}
+
+		// return unevaluated list
+		return a, nil
+	}
+	panic(fmt.Errorf("Unexpected Expr type: %v (%T)", e, e))
 }
 
 func (f *FuncRuntime) evalExpr(e Expr) (Expr, error) {
