@@ -23,16 +23,21 @@ func TestExamples(t *testing.T) {
 				t.Fatalf("Cannot open input file: %v", err)
 			}
 			defer fin.Close()
+
+			expData, err := ioutil.ReadFile(output)
+			if os.IsNotExist(err) {
+				t.Skipf("No output file for %v found", test)
+			}
+			if err != nil {
+				t.Fatalf("Reading output file failed: %v", err)
+			}
+
 			buffer := &strings.Builder{}
 			in := NewInterpreter(fin, buffer)
 			if err := in.Run(); err != nil {
 				t.Fatalf("Interpreter Run() failed: %v", err)
 			}
 
-			expData, err := ioutil.ReadFile(output)
-			if err != nil {
-				t.Fatalf("Reading output file failed: %v", err)
-			}
 			if act, exp := buffer.String(), string(expData); act != exp {
 				t.Errorf("Incorrect output for %v: expected %q, actual %q", test, exp, act)
 			}
