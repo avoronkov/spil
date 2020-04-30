@@ -6,11 +6,10 @@ import (
 )
 
 type Interpret struct {
-	parser   *Parser
-	output   io.Writer
-	vars     map[string]Expr
-	deffuncs map[string]Func
-	funcs    map[string]*FuncInterpet
+	parser *Parser
+	output io.Writer
+	vars   map[string]Expr
+	funcs  map[string]Evaler
 }
 
 func NewInterpreter(r io.Reader, w io.Writer) *Interpret {
@@ -18,21 +17,20 @@ func NewInterpreter(r io.Reader, w io.Writer) *Interpret {
 		parser: NewParser(r),
 		output: w,
 		vars:   make(map[string]Expr),
-		funcs:  make(map[string]*FuncInterpet),
 	}
-	i.deffuncs = map[string]Func{
-		"+":      FPlus,
-		"-":      FMinus,
-		"*":      FMultiply,
-		"/":      FDiv,
-		"<":      FLess,
-		">":      FMore,
-		"=":      FEq,
-		"not":    FNot,
-		"print":  i.FPrint,
-		"head":   FHead,
-		"tail":   FTail,
-		"append": FAppend,
+	i.funcs = map[string]Evaler{
+		"+":      EvalerFunc(FPlus),
+		"-":      EvalerFunc(FMinus),
+		"*":      EvalerFunc(FMultiply),
+		"/":      EvalerFunc(FDiv),
+		"<":      EvalerFunc(FLess),
+		">":      EvalerFunc(FMore),
+		"=":      EvalerFunc(FEq),
+		"not":    EvalerFunc(FNot),
+		"print":  EvalerFunc(i.FPrint),
+		"head":   EvalerFunc(FHead),
+		"tail":   EvalerFunc(FTail),
+		"append": EvalerFunc(FAppend),
 	}
 	return i
 }
@@ -74,11 +72,7 @@ L:
 	if err != nil {
 		return err
 	}
-	mainRuntime, err := mainInterpret.Bind(nil)
-	if err != nil {
-		return err
-	}
-	_, err = mainRuntime.Eval()
+	_, err = mainInterpret.Eval(nil)
 	return err
 }
 

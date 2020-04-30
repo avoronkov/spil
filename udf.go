@@ -6,16 +6,15 @@ import (
 
 // User-defined functions
 
-type FuncInterpet struct {
+type FuncInterpret struct {
 	interpret *Interpret
 	name      string
 	argfmt    Expr
-	// vars   map[string]Expr
-	body []Expr
+	body      []Expr
 }
 
-func NewFuncInterpret(i *Interpret, name string, argfmt Expr, body []Expr) (*FuncInterpet, error) {
-	fi := &FuncInterpet{
+func NewFuncInterpret(i *Interpret, name string, argfmt Expr, body []Expr) (*FuncInterpret, error) {
+	fi := &FuncInterpret{
 		interpret: i,
 		name:      name,
 		body:      body,
@@ -38,8 +37,16 @@ func NewFuncInterpret(i *Interpret, name string, argfmt Expr, body []Expr) (*Fun
 	return fi, nil
 }
 
+func (f *FuncInterpret) Eval(args []Expr) (Expr, error) {
+	run, err := f.bind(args)
+	if err != nil {
+		return nil, err
+	}
+	return run.Eval()
+}
+
 // Evaluate function with specified arguments
-func (f *FuncInterpet) Bind(args []Expr) (*FuncRuntime, error) {
+func (f *FuncInterpret) bind(args []Expr) (*FuncRuntime, error) {
 	fr := &FuncRuntime{
 		fi:   f,
 		vars: make(map[string]Expr),
@@ -60,7 +67,7 @@ func (f *FuncInterpet) Bind(args []Expr) (*FuncRuntime, error) {
 }
 
 type FuncRuntime struct {
-	fi   *FuncInterpet
+	fi   *FuncInterpret
 	vars map[string]Expr
 }
 
@@ -157,28 +164,11 @@ func (f *FuncRuntime) evalFunc(se *Sexpr) (Expr, error) {
 	if !ok {
 		return nil, fmt.Errorf("Wanted identifier, found: %v", head)
 	}
-	if fu, ok := f.fi.interpret.funcs[string(name)]; ok {
-		// evaluate arguments
-		tail := se.Tail()
-		args := make([]Expr, 0, len(tail.List))
-		for _, arg := range tail.List {
-			res, err := f.evalExpr(arg)
-			if err != nil {
-				return nil, err
-			}
-			args = append(args, res)
-		}
-		fr, err := fu.Bind(args)
-		if err != nil {
-			return nil, err
-		}
-		return fr.Eval()
-
-	}
-	fn, ok := f.fi.interpret.deffuncs[string(name)]
+	fu, ok := f.fi.interpret.funcs[string(name)]
 	if !ok {
 		return nil, fmt.Errorf("Unknown function: %v", name)
 	}
+
 	// evaluate arguments
 	tail := se.Tail()
 	args := make([]Expr, 0, len(tail.List))
@@ -189,6 +179,6 @@ func (f *FuncRuntime) evalFunc(se *Sexpr) (Expr, error) {
 		}
 		args = append(args, res)
 	}
-	result, err := fn(args)
+	result, err := fu.Eval(args)
 	return result, err
 }

@@ -4,7 +4,15 @@ import (
 	"fmt"
 )
 
-type Func func([]Expr) (Expr, error)
+type Evaler interface {
+	Eval([]Expr) (Expr, error)
+}
+
+type EvalerFunc func([]Expr) (Expr, error)
+
+func (f EvalerFunc) Eval(args []Expr) (Expr, error) {
+	return f(args)
+}
 
 func FPlus(args []Expr) (Expr, error) {
 	var result int
