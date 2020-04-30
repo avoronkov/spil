@@ -1,4 +1,4 @@
-# Check if number is prime
+; Check if number is prime
 
 (func modulo (n k)
 	  (if (< n k)
@@ -23,4 +23,4 @@
 		(primes-between (+ start 1) finish)))
 
 (primes-between 2 30)
-# vim: ft=lisp
+; vim: ft=lisp

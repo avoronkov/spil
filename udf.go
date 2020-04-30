@@ -93,7 +93,7 @@ func (f *FuncRuntime) evalExpr(e Expr) (Expr, error) {
 		if value, ok := f.vars[string(a)]; ok {
 			return value, nil
 		}
-		return nil, fmt.Errorf("Unknown identifier: %v", a)
+		return a, nil
 	case *Sexpr:
 		if a.Quoted {
 			return a, nil
@@ -164,9 +164,18 @@ func (f *FuncRuntime) evalFunc(se *Sexpr) (Expr, error) {
 	if !ok {
 		return nil, fmt.Errorf("Wanted identifier, found: %v", head)
 	}
-	fu, ok := f.fi.interpret.funcs[string(name)]
+	fname := string(name)
+	// Ability to pass function name as argument
+	if v, ok := f.vars[fname]; ok {
+		vident, ok := v.(Ident)
+		if !ok {
+			return nil, fmt.Errorf("Cannot use argument %v as function", v.Repr())
+		}
+		fname = string(vident)
+	}
+	fu, ok := f.fi.interpret.funcs[fname]
 	if !ok {
-		return nil, fmt.Errorf("Unknown function: %v", name)
+		return nil, fmt.Errorf("%v: Unknown function: %v", f.fi.name, name)
 	}
 
 	// evaluate arguments
