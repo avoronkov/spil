@@ -54,7 +54,7 @@ L:
 				return fmt.Errorf("Unexpected quoted s-expression: %v", a)
 			}
 			if a.Len() == 0 {
-				return fmt.Errorf("Unexpected empty s-expression: %v", a)
+				return fmt.Errorf("Unexpected empty s-expression on top-level: %v", a)
 			}
 			head, _ := a.Head()
 			if name, ok := head.(Ident); ok {

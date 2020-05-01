@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 )
 
 // User-defined functions
@@ -64,28 +65,37 @@ func (f *FuncRuntime) bind(args []Expr) ([]Expr, error) {
 		argfmt Expr
 		body   []Expr
 	)
+	argfmtFound := false
 	for _, impl := range f.fi.bodies {
 		if matchArgs(impl.argfmt, args) {
 			argfmt = impl.argfmt
 			body = impl.body
+			argfmtFound = true
 			break
 		}
 	}
-	if argfmt == nil {
+	if !argfmtFound {
 		return nil, fmt.Errorf("No matching function implementation for %v found", f.fi.name)
 	}
-	switch a := argfmt.(type) {
-	case Ident:
-		f.vars[string(a)] = &Sexpr{List: args, Quoted: true}
-	case *Sexpr:
-		if l := a.Len(); l != len(args) {
-			return nil, fmt.Errorf("Incorrect number of arguments to %v: expected %v, found %v", f.fi.name, l, len(args))
-		}
-		for i, ident := range a.List {
-			if iname, ok := ident.(Ident); ok {
-				f.vars[string(iname)] = args[i]
+	if argfmt != nil {
+		switch a := argfmt.(type) {
+		case Ident:
+			f.vars[string(a)] = &Sexpr{List: args, Quoted: true}
+		case *Sexpr:
+			if l := a.Len(); l != len(args) {
+				return nil, fmt.Errorf("Incorrect number of arguments to %v: expected %v, found %v", f.fi.name, l, len(args))
+			}
+			for i, ident := range a.List {
+				if iname, ok := ident.(Ident); ok {
+					f.vars[string(iname)] = args[i]
+				}
 			}
 		}
+	}
+	// bind to __args and _1, _2 ... variables
+	f.vars["__args"] = &Sexpr{List: args, Quoted: true}
+	for i, arg := range args {
+		f.vars[fmt.Sprintf("_%d", i+1)] = arg
 	}
 	return body, nil
 }
@@ -161,7 +171,7 @@ func (f *FuncRuntime) lastExpr(e Expr) (Expr, error) {
 			return a, nil
 		}
 		if a.Len() == 0 {
-			return nil, fmt.Errorf("Unexpected empty s-expression: %v", a)
+			return nil, fmt.Errorf("%v: Unexpected empty s-expression: %v", f.fi.name, a)
 		}
 		head, _ := a.Head()
 		if name, ok := head.(Ident); ok {
@@ -193,11 +203,11 @@ func (f *FuncRuntime) lastExpr(e Expr) (Expr, error) {
 			}
 			if name == "gen" {
 				tail, _ := a.Tail()
-				res, err := f.evalGen(tail.(*Sexpr))
-				if err != nil {
-					return nil, err
-				}
-				return res, nil
+				return f.evalGen(tail.(*Sexpr))
+			}
+			if name == "lambda" {
+				tail, _ := a.Tail()
+				return f.evalLambda(tail.(*Sexpr))
 			}
 		}
 
@@ -306,7 +316,47 @@ func (f *FuncRuntime) evalFunc(se *Sexpr) (Expr, error) {
 	return result, err
 }
 
+var lambdaCount = 0
+
+func (f *FuncRuntime) evalLambda(se *Sexpr) (Expr, error) {
+	name := fmt.Sprintf("__lambda__%03d", lambdaCount)
+	lambdaCount++
+	fi := NewFuncInterpret(f.fi.interpret, name)
+	body := f.replaceVars(se.List)
+	fi.AddImpl(QList(Ident("__args")), body)
+	f.fi.interpret.funcs[name] = fi
+	return Ident(name), nil
+}
+
+var lambdaArgRe = regexp.MustCompile(`^(_[0-9]+|__args)$`)
+
+func (f *FuncRuntime) replaceVars(st []Expr) (res []Expr) {
+	for _, s := range st {
+		switch a := s.(type) {
+		case *Sexpr:
+			v := &Sexpr{Quoted: a.Quoted}
+			v.List = f.replaceVars(a.List)
+			res = append(res, v)
+		case Ident:
+			if lambdaArgRe.MatchString(string(a)) {
+				res = append(res, a)
+			} else if v, ok := f.vars[string(a)]; ok {
+				res = append(res, v)
+			} else {
+				res = append(res, a)
+			}
+		default:
+			res = append(res, s)
+		}
+	}
+	return res
+}
+
 func matchArgs(argfmt Expr, args []Expr) (result bool) {
+	if argfmt == nil {
+		// null matches everything (lambda case)
+		return true
+	}
 	binds := map[string]Expr{}
 	switch a := argfmt.(type) {
 	case *Sexpr:
