@@ -9,3 +9,7 @@
 - pass command line arguments to the command
 
 - lazy lists (?)
+
+- apply
+
+- anonymous functions (?)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 )
 
 // User-defined functions
@@ -94,6 +95,7 @@ func (f *FuncRuntime) Eval(body []Expr) (res Expr, err error) {
 	last := len(body) - 1
 L:
 	for {
+		log.Printf("Function %q: eval %v over %+v", f.fi.name, body, f.vars)
 		for i, expr := range body {
 			if i == last {
 				// check for tail call
@@ -307,6 +309,11 @@ func (f *FuncRuntime) evalFunc(se *Sexpr) (Expr, error) {
 }
 
 func matchArgs(argfmt Expr, args []Expr) (result bool) {
+	defer func() {
+		log.Printf("matchArgs(%v, %+v) = %v", argfmt, args, result)
+	}()
+
+	binds := map[string]Expr{}
 	switch a := argfmt.(type) {
 	case *Sexpr:
 		if len(a.List) == 0 && len(args) == 0 {
@@ -319,22 +326,39 @@ func matchArgs(argfmt Expr, args []Expr) (result bool) {
 			switch at := t.(type) {
 			case Int:
 				v, ok := args[i].(Int)
-				return ok && at == v
+				if ok && at != v {
+					return false
+				}
 			case Str:
 				v, ok := args[i].(Str)
-				return ok && at == v
+				if ok && at != v {
+					return false
+				}
 			case Bool:
 				v, ok := args[i].(Bool)
-				return ok && at == v
+				if ok && at != v {
+					return false
+				}
 			case *Sexpr:
 				v, ok := args[i].(*Sexpr)
-				return ok && at.Repr() == v.Repr()
+				if ok && at.Repr() != v.Repr() {
+					return false
+				}
 			case Ident:
-				// Ident matches everything
-				return true
+				// check if param is already binded
+				log.Printf("binds = %+v", binds)
+				if val, ok := binds[string(at)]; ok {
+					log.Printf("binds[%v] = %v ?= %v", string(at), val.Repr(), args[i].Repr())
+					if val.Repr() != args[i].Repr() {
+						return false
+					}
+				}
+				binds[string(at)] = args[i]
+			default:
+				panic(fmt.Errorf("Unexpected expr: %v (%T)", t, t))
 			}
-			panic(fmt.Errorf("Unexpected expr: %v (%T)", t, t))
 		}
+		return true
 	case Ident:
 		// Ident matches everything
 		return true
