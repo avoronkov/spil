@@ -287,3 +287,39 @@ func (f *FuncRuntime) evalFunc(se *Sexpr) (Expr, error) {
 	result, err := fu.Eval(args)
 	return result, err
 }
+
+func matchArgs(argfmt Expr, args []Expr) bool {
+	switch a := argfmt.(type) {
+	case *Sexpr:
+		if len(a.List) == 0 && len(args) == 0 {
+			return true
+		}
+		if len(a.List) != len(args) {
+			return false
+		}
+		for i, t := range a.List {
+			switch at := t.(type) {
+			case Int:
+				v, ok := args[i].(Int)
+				return ok && at == v
+			case Str:
+				v, ok := args[i].(Str)
+				return ok && at == v
+			case Bool:
+				v, ok := args[i].(Bool)
+				return ok && at == v
+			case *Sexpr:
+				v, ok := args[i].(*Sexpr)
+				return ok && at.Repr() == v.Repr()
+			case Ident:
+				// Ident matches everything
+				return true
+			}
+			panic(fmt.Errorf("Unexpected expr: %v (%T)", t, t))
+		}
+	case Ident:
+		// Ident matches everything
+		return true
+	}
+	panic(fmt.Errorf("Unexpected argument format type: %v (%T)", argfmt, argfmt))
+}
