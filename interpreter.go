@@ -31,6 +31,7 @@ func NewInterpreter(r io.Reader, w io.Writer) *Interpret {
 		"head":   EvalerFunc(FHead),
 		"tail":   EvalerFunc(FTail),
 		"append": EvalerFunc(FAppend),
+		"empty":  EvalerFunc(FEmpty),
 	}
 	return i
 }
@@ -55,10 +56,11 @@ L:
 			if a.Len() == 0 {
 				return fmt.Errorf("Unexpected empty s-expression: %v", a)
 			}
-			head := a.Head()
+			head, _ := a.Head()
 			if name, ok := head.(Ident); ok {
 				if name == "func" || name == "def" {
-					if err := i.defineFunc(a.Tail()); err != nil {
+					tail, _ := a.Tail()
+					if err := i.defineFunc(tail.(*Sexpr)); err != nil {
 						return err
 					}
 					continue L

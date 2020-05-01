@@ -1,0 +1,30 @@
+; Lazy generator example
+
+(def take (n lst) (take n lst '()))
+(def take (0 lst acc) acc)
+(def take (n lst acc) (take (- n 1) (tail lst) (append acc (head lst))))
+
+; iterator: state -> (value, new-state)
+(def from-int (state) (append '() state (+ state 1)))
+
+; gen: iterator initial-state -> lazy-list
+(set ints (gen from-int 1))
+
+(print (take 20 ints))
+
+
+; iterator: state -> new-state
+(def next-int (n) (append '() (+ n 1)))
+(set ints2 (gen next-int 0))
+
+(print (take 20 ints2))
+
+; finite iterator: state -> '()
+(def next-below-10 (10) '())
+(def next-below-10 (n) (append '() (+ n 1)))
+(set ints3 (gen next-below-10 0))
+
+; print evaluates lazy list
+(print ints3)
+
+; vim: ft=lisp

@@ -62,6 +62,15 @@ func (i Bool) Repr() string {
 	}
 }
 
+type List interface {
+	Expr
+	Head() (Expr, error)
+	Tail() (List, error)
+	Empty() bool
+}
+
+var _ List = (*Sexpr)(nil)
+
 type Sexpr struct {
 	List   []Expr
 	Quoted bool
@@ -108,34 +117,27 @@ func (s *Sexpr) Repr() string {
 	return b.String()
 }
 
-// Mostly for equality of lists regardless of quoting.
-func (s *Sexpr) ReprNoQuotes() string {
-	b := &strings.Builder{}
-	fmt.Fprintf(b, "{S:")
-	for _, item := range s.List {
-		fmt.Fprintf(b, " %v", item.Repr())
-	}
-	fmt.Fprintf(b, "}")
-	return b.String()
-}
-
 func (s *Sexpr) Len() int {
 	return len(s.List)
 }
 
-func (s *Sexpr) Head() Expr {
+func (s *Sexpr) Head() (Expr, error) {
 	if len(s.List) == 0 {
-		panic(fmt.Errorf("Cannot perform Head() on empty list"))
+		return nil, fmt.Errorf("Cannot perform Head() on empty list")
 	}
-	return s.List[0]
+	return s.List[0], nil
 }
 
-func (s *Sexpr) Tail() *Sexpr {
+func (s *Sexpr) Tail() (List, error) {
 	if len(s.List) == 0 {
-		panic(fmt.Errorf("Cannot perform Tail() on empty list"))
+		return nil, fmt.Errorf("Cannot perform Tail() on empty list")
 	}
 	return &Sexpr{
 		List:   s.List[1:],
 		Quoted: s.Quoted,
-	}
+	}, nil
+}
+
+func (s *Sexpr) Empty() bool {
+	return len(s.List) == 0
 }

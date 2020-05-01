@@ -153,22 +153,33 @@ func FHead(args []Expr) (Expr, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("FHead: expected 1 argument, found %v", args)
 	}
-	a, ok := args[0].(*Sexpr)
+	a, ok := args[0].(List)
 	if !ok {
 		return nil, fmt.Errorf("FHead: expected argument to be List, found %v", args[0].Repr())
 	}
-	return a.Head(), nil
+	return a.Head()
 }
 
 func FTail(args []Expr) (Expr, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("FTail: expected 1 argument, found %v", args)
 	}
-	a, ok := args[0].(*Sexpr)
+	a, ok := args[0].(List)
 	if !ok {
 		return nil, fmt.Errorf("FTail: expected argument to be List, found %v", args[0].Repr())
 	}
-	return a.Tail(), nil
+	return a.Tail()
+}
+
+func FEmpty(args []Expr) (Expr, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("FEmpty: expected 1 argument, found %v", args)
+	}
+	a, ok := args[0].(List)
+	if !ok {
+		return nil, fmt.Errorf("FEmpty: expected argument to be List, found %v", args[0].Repr())
+	}
+	return Bool(a.Empty()), nil
 }
 
 func FAppend(args []Expr) (Expr, error) {
