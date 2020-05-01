@@ -91,9 +91,9 @@ func (f *FuncRuntime) bind(args []Expr) ([]Expr, error) {
 }
 
 func (f *FuncRuntime) Eval(body []Expr) (res Expr, err error) {
-	last := len(body) - 1
 L:
 	for {
+		last := len(body) - 1
 		// log.Printf("Function %q: eval %v over %+v", f.fi.name, body, f.vars)
 		for i, expr := range body {
 			if i == last {
