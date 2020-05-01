@@ -20,6 +20,8 @@ func TestMatchArgs(t *testing.T) {
 		{QList(Ident("x"), Ident("x")), []Expr{Int(1), Int(1)}, true},
 		{QList(Ident("x"), Ident("x")), []Expr{Int(1), Int(2)}, false},
 		{QList(Ident("x"), Int(1)), []Expr{Int(1), Int(2)}, false},
+		{QList(Int(1)), []Expr{Str("hello")}, false},
+		{QList(QEmpty), []Expr{makeEmptyGen()}, true},
 	}
 	for i, test := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
@@ -29,4 +31,11 @@ func TestMatchArgs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func makeEmptyGen() List {
+	gen := func(args []Expr) (Expr, error) {
+		return QEmpty, nil
+	}
+	return NewLazyList(EvalerFunc(gen), QEmpty)
 }

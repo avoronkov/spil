@@ -166,6 +166,7 @@ func (f *FuncRuntime) lastExpr(e Expr) (Expr, error) {
 		head, _ := a.Head()
 		if name, ok := head.(Ident); ok {
 			if name == "if" {
+				// (cond) (expr-if-true) (expr-if-false)
 				if len(a.List) != 4 {
 					return nil, fmt.Errorf("Expected 3 arguments to if, found: %v", a.List[1:])
 				}
@@ -219,27 +220,6 @@ func (f *FuncRuntime) evalExpr(expr Expr) (Expr, error) {
 		return lst, nil
 	}
 	return f.evalFunc(lst)
-}
-
-// (cond) (expr-if-true) (expr-if-false)
-func (f *FuncRuntime) evalIf(se *Sexpr) (Expr, error) {
-	if len(se.List) != 3 {
-		return nil, fmt.Errorf("Expected 3 arguments to if, found: %v", se)
-	}
-	arg := se.List[0]
-	res, err := f.evalExpr(arg)
-	if err != nil {
-		return nil, err
-	}
-	boolRes, ok := res.(Bool)
-	if !ok {
-		return nil, fmt.Errorf("Argument %v should evaluate to boolean value, actual %v", arg, res)
-	}
-	if bool(boolRes) {
-		return f.evalExpr(se.List[1])
-	} else {
-		return f.evalExpr(se.List[2])
-	}
 }
 
 // (var-name) (value)
@@ -340,23 +320,30 @@ func matchArgs(argfmt Expr, args []Expr) (result bool) {
 			switch at := t.(type) {
 			case Int:
 				v, ok := args[i].(Int)
-				if ok && at != v {
+				if !ok || at != v {
 					return false
 				}
 			case Str:
 				v, ok := args[i].(Str)
-				if ok && at != v {
+				if !ok || at != v {
 					return false
 				}
 			case Bool:
 				v, ok := args[i].(Bool)
-				if ok && at != v {
+				if !ok || at != v {
 					return false
 				}
 			case *Sexpr:
-				v, ok := args[i].(*Sexpr)
-				if ok && at.Repr() != v.Repr() {
-					return false
+				if at.Empty() {
+					// special case to match empty lazy list
+					if v, ok := args[i].(List); !ok || !v.Empty() {
+						return false
+					}
+				} else {
+					v, ok := args[i].(*Sexpr)
+					if !ok || at.Repr() != v.Repr() {
+						return false
+					}
 				}
 			case Ident:
 				// check if param is already binded
