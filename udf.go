@@ -9,40 +9,42 @@ import (
 type FuncInterpret struct {
 	interpret *Interpret
 	name      string
-	argfmt    Expr
-	body      []Expr
+	bodies    []FuncImpl
 }
 
-func NewFuncInterpret(i *Interpret, name string, argfmt Expr, body []Expr) (*FuncInterpret, error) {
-	fi := &FuncInterpret{
+type FuncImpl struct {
+	argfmt Expr
+	body   []Expr
+}
+
+func NewFuncInterpret(i *Interpret, name string) *FuncInterpret {
+	return &FuncInterpret{
 		interpret: i,
 		name:      name,
-		body:      body,
 	}
-	switch a := argfmt.(type) {
+}
+
+func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr) error {
+	switch argfmt.(type) {
 	case Ident:
 		// pass arguments as list with specified name
-		fi.argfmt = a
+		f.bodies = append(f.bodies, FuncImpl{argfmt, body})
 	case *Sexpr:
 		// bind arguments
-		for _, arg := range a.List {
-			if _, ok := arg.(Ident); !ok {
-				return nil, fmt.Errorf("argument name should be identifier, found %v", arg.Repr())
-			}
-		}
-		fi.argfmt = a
+		f.bodies = append(f.bodies, FuncImpl{argfmt, body})
 	default:
-		return nil, fmt.Errorf("Expected arguments signature, found: %v", argfmt)
+		return fmt.Errorf("Expected arguments signature, found: %v", argfmt)
 	}
-	return fi, nil
+	return nil
 }
 
 func (f *FuncInterpret) Eval(args []Expr) (Expr, error) {
 	run := NewFuncRuntime(f)
-	if err := run.bind(args); err != nil {
+	body, err := run.bind(args)
+	if err != nil {
 		return nil, err
 	}
-	return run.Eval()
+	return run.Eval(body)
 }
 
 type FuncRuntime struct {
@@ -56,28 +58,43 @@ func NewFuncRuntime(fi *FuncInterpret) *FuncRuntime {
 	}
 }
 
-func (f *FuncRuntime) bind(args []Expr) error {
+func (f *FuncRuntime) bind(args []Expr) ([]Expr, error) {
 	f.vars = make(map[string]Expr)
-	switch a := f.fi.argfmt.(type) {
+	var (
+		argfmt Expr
+		body   []Expr
+	)
+	for _, impl := range f.fi.bodies {
+		if matchArgs(impl.argfmt, args) {
+			argfmt = impl.argfmt
+			body = impl.body
+			break
+		}
+	}
+	if argfmt == nil {
+		return nil, fmt.Errorf("No matching function implementation for %v found", f.fi.name)
+	}
+	switch a := argfmt.(type) {
 	case Ident:
 		f.vars[string(a)] = &Sexpr{List: args, Quoted: true}
 	case *Sexpr:
 		if l := a.Len(); l != len(args) {
-			return fmt.Errorf("Incorrect number of arguments to %v: expected %v, found %v", f.fi.name, l, len(args))
+			return nil, fmt.Errorf("Incorrect number of arguments to %v: expected %v, found %v", f.fi.name, l, len(args))
 		}
 		for i, ident := range a.List {
-			name := string(ident.(Ident))
-			f.vars[name] = args[i]
+			if iname, ok := ident.(Ident); ok {
+				f.vars[string(iname)] = args[i]
+			}
 		}
 	}
-	return nil
+	return body, nil
 }
 
-func (f *FuncRuntime) Eval() (res Expr, err error) {
-	last := len(f.fi.body) - 1
+func (f *FuncRuntime) Eval(body []Expr) (res Expr, err error) {
+	last := len(body) - 1
 L:
 	for {
-		for i, expr := range f.fi.body {
+		for i, expr := range body {
 			if i == last {
 				// check for tail call
 				e, err := f.lastExpr(expr)
@@ -108,7 +125,8 @@ L:
 					}
 					args = append(args, arg)
 				}
-				if err := f.bind(args); err != nil {
+				body, err = f.bind(args)
+				if err != nil {
 					return nil, err
 				}
 				continue L
@@ -167,7 +185,7 @@ func (f *FuncRuntime) lastExpr(e Expr) (Expr, error) {
 				if err := f.setVar(a.Tail()); err != nil {
 					return nil, err
 				}
-				return &Sexpr{Quoted: true}, nil
+				return QEmpty, nil
 			}
 		}
 
@@ -206,7 +224,7 @@ func (f *FuncRuntime) evalExpr(e Expr) (Expr, error) {
 				if err := f.setVar(a.Tail()); err != nil {
 					return nil, err
 				}
-				return &Sexpr{Quoted: true}, nil
+				return QEmpty, nil
 			}
 		}
 
@@ -288,7 +306,7 @@ func (f *FuncRuntime) evalFunc(se *Sexpr) (Expr, error) {
 	return result, err
 }
 
-func matchArgs(argfmt Expr, args []Expr) bool {
+func matchArgs(argfmt Expr, args []Expr) (result bool) {
 	switch a := argfmt.(type) {
 	case *Sexpr:
 		if len(a.List) == 0 && len(args) == 0 {

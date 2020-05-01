@@ -67,6 +67,16 @@ type Sexpr struct {
 	Quoted bool
 }
 
+func QList(args ...Expr) *Sexpr {
+	res := &Sexpr{Quoted: true}
+	for _, arg := range args {
+		res.List = append(res.List, arg)
+	}
+	return res
+}
+
+var QEmpty = &Sexpr{Quoted: true}
+
 func (s *Sexpr) String() string {
 	b := &strings.Builder{}
 	if s.Quoted {

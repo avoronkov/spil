@@ -68,11 +68,11 @@ L:
 		mainBody = append(mainBody, expr)
 	}
 	// Interpreter LOOP
-	mainInterpret, err := NewFuncInterpret(i, "__main__", &Sexpr{Quoted: true}, mainBody)
-	if err != nil {
+	mainInterpret := NewFuncInterpret(i, "__main__")
+	if err := mainInterpret.AddImpl(QEmpty, mainBody); err != nil {
 		return err
 	}
-	_, err = mainInterpret.Eval(nil)
+	_, err := mainInterpret.Eval(nil)
 	return err
 }
 
@@ -86,12 +86,21 @@ func (i *Interpret) defineFunc(se *Sexpr) error {
 		return fmt.Errorf("func expected identifier first, found %v", se.List[0].Repr())
 	}
 
-	fi, err := NewFuncInterpret(i, string(name), se.List[1], se.List[2:])
-	if err != nil {
-		return err
+	fname := string(name)
+	var fi *FuncInterpret
+
+	evaler, ok := i.funcs[fname]
+	if ok {
+		f, ok := evaler.(*FuncInterpret)
+		if !ok {
+			return fmt.Errorf("Cannot redefine builtin function %v", fname)
+		}
+		fi = f
+	} else {
+		fi = NewFuncInterpret(i, fname)
+		i.funcs[fname] = fi
 	}
-	i.funcs[string(name)] = fi
-	return nil
+	return fi.AddImpl(se.List[1], se.List[2:])
 }
 
 func (in *Interpret) FPrint(args []Expr) (Expr, error) {
@@ -102,5 +111,5 @@ func (in *Interpret) FPrint(args []Expr) (Expr, error) {
 		fmt.Fprintf(in.output, "%v", e.String())
 	}
 	fmt.Fprintf(in.output, "\n")
-	return &Sexpr{Quoted: true}, nil
+	return QEmpty, nil
 }
