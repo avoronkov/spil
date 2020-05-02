@@ -447,7 +447,7 @@ func matchArgs(argfmt Expr, args []Expr) (result bool) {
 			switch at := t.(type) {
 			case Int:
 				v, ok := args[i].(Int)
-				if !ok || at != v {
+				if !ok || !at.Eq(v) {
 					return false
 				}
 			case Str:
