@@ -254,7 +254,11 @@ func (f *FuncRuntime) evalGen(se *Sexpr) (Expr, error) {
 	if se.Len() != 2 {
 		return nil, fmt.Errorf("gen wants 2 argument, found %v", se.Repr())
 	}
-	fident, ok := se.List[0].(Ident)
+	fn, err := f.evalExpr(se.List[0])
+	if err != nil {
+		return nil, err
+	}
+	fident, ok := fn.(Ident)
 	if !ok {
 		return nil, fmt.Errorf("gen expects first argument to be a funtion, found: %v", se.List[0])
 	}

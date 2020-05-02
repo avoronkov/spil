@@ -130,10 +130,27 @@ func FEq(args []Expr) (Expr, error) {
 		return Bool(a == b), nil
 	case *Sexpr:
 		b, ok := args[1].(*Sexpr)
-		if !ok {
-			return nil, fmt.Errorf("FEq: Expected second argument to be Str, found %v", args[1].Repr())
+		if ok {
+			return Bool(a.Repr() == b.Repr()), nil
 		}
-		return Bool(a.Repr() == b.Repr()), nil
+		if !a.Empty() {
+			return nil, fmt.Errorf("FEq: Expected second argument to be List, found %v", args[1].Repr())
+		}
+		l, ok := args[1].(*LazyList)
+		if !ok {
+			return nil, fmt.Errorf("FEq: Expected second argument to be List or Lazy List, found %v", args[1].Repr())
+		}
+		return Bool(l.Empty()), nil
+	case *LazyList:
+		// Lazy list can be compared only to '()
+		b, ok := args[1].(*Sexpr)
+		if !ok {
+			return nil, fmt.Errorf("FEq: Expected second argument to be '(), found %v", args[1].Repr())
+		}
+		if !b.Empty() {
+			return nil, fmt.Errorf("FEq: Cannot compare lazy list with non-empty list: %v", args[1].Repr())
+		}
+		return Bool(a.Empty()), nil
 	}
 	panic(fmt.Errorf("Unknown argument type: %v (%T)", args[0], args[0]))
 }
