@@ -15,11 +15,17 @@ func TestExamples(t *testing.T) {
 	}
 
 	for _, test := range inputs {
-		t.Run(test, func(t *testing.T) {
-			dir, file := filepath.Split(test)
-			output := filepath.Join(dir, "out"+file[2:])
-			checkInterpreter(t, test, output, false)
-		})
+		for _, bigint := range []bool{false, true} {
+			name := test
+			if bigint {
+				name += "-big"
+			}
+			t.Run(name, func(t *testing.T) {
+				dir, file := filepath.Split(test)
+				output := filepath.Join(dir, "out"+file[2:])
+				checkInterpreter(t, test, output, false, bigint)
+			})
+		}
 	}
 }
 
@@ -29,15 +35,21 @@ func TestBuiltin(t *testing.T) {
 		panic(err)
 	}
 	for _, test := range inputs {
-		t.Run(test, func(t *testing.T) {
-			dir, file := filepath.Split(test)
-			output := filepath.Join(dir, "output."+file)
-			checkInterpreter(t, test, output, true)
-		})
+		for _, bigint := range []bool{false, true} {
+			name := test
+			if bigint {
+				name += "-big"
+			}
+			t.Run(name, func(t *testing.T) {
+				dir, file := filepath.Split(test)
+				output := filepath.Join(dir, "output."+file)
+				checkInterpreter(t, test, output, true, bigint)
+			})
+		}
 	}
 }
 
-func checkInterpreter(t *testing.T, input, output string, builtin bool) {
+func checkInterpreter(t *testing.T, input, output string, builtin, bigint bool) {
 	fin, err := os.Open(input)
 	if err != nil {
 		t.Fatalf("Cannot open input file: %v", err)
@@ -54,6 +66,7 @@ func checkInterpreter(t *testing.T, input, output string, builtin bool) {
 
 	buffer := &strings.Builder{}
 	in := NewInterpreter(buffer)
+	in.UseBigInt(bigint)
 	if builtin {
 		if err := in.LoadBuiltin("./builtin"); err != nil {
 			t.Fatal(err)

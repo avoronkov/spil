@@ -26,22 +26,28 @@ func TestNextToken(t *testing.T) {
 	}
 
 	for _, test := range testdata {
-		t.Run(test.input, func(t *testing.T) {
-			p := NewParser(strings.NewReader(test.input), false)
-			var tokens []string
-			for {
-				tok, err := p.nextToken()
-				if err == io.EOF {
-					break
-				}
-				if err != nil {
-					t.Fatalf("nextToken() failed; %v", err)
-				}
-				tokens = append(tokens, tok)
+		for _, bigint := range []bool{false, true} {
+			name := test.input
+			if bigint {
+				name += "-big"
 			}
-			if !reflect.DeepEqual(tokens, test.result) {
-				t.Errorf("Tokens are parsed incorrectly:\nexpected %s,\n  actual %s", test.result[0], tokens[0])
-			}
-		})
+			t.Run(name, func(t *testing.T) {
+				p := NewParser(strings.NewReader(test.input), bigint)
+				var tokens []string
+				for {
+					tok, err := p.nextToken()
+					if err == io.EOF {
+						break
+					}
+					if err != nil {
+						t.Fatalf("nextToken() failed; %v", err)
+					}
+					tokens = append(tokens, tok)
+				}
+				if !reflect.DeepEqual(tokens, test.result) {
+					t.Errorf("Tokens are parsed incorrectly:\nexpected %s,\n  actual %s", test.result[0], tokens[0])
+				}
+			})
+		}
 	}
 }
