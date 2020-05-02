@@ -13,11 +13,12 @@
 (print (take 20 ints))
 
 
-; iterator: state -> new-state
+; iterator: state -> (new-state)
 (def next-int (n) (list (+ n 1)))
 (set ints2 (gen next-int 0))
 
 (print (take 20 ints2))
+
 
 ; finite iterator: state -> '()
 (def next-below-10 (10) '())
@@ -26,5 +27,11 @@
 
 ; print evaluates lazy list
 (print ints3)
+
+
+; iterator: state -> new-state
+(def inc (n) (+ n 1))
+(set ints4 (gen inc 0))
+(print (take 15 ints4))
 
 ; vim: ft=lisp

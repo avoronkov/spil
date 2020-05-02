@@ -44,9 +44,7 @@
 	 (set
 	   iter
 	   (lambda
-		 (if (empty _1)
+		 (if (or (empty _1) (not (pred (head _1))))
 		   '()
-		   (if (pred (head _1))
-			 (list (head _1) (tail _1))
-			 (self (tail _1))))))
+		   (list (head _1) (tail _1)))))
 	 (gen iter lst))

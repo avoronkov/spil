@@ -50,6 +50,7 @@ func (l *LazyList) Repr() string {
 func (l *LazyList) Head() (Expr, error) {
 	// iter: state -> '(value, new-state)
 	// iter: value -> '(new-value)
+	// iter: value -> new-value
 	// iter: value -> '()  ; list finished
 	if !l.valueReady {
 		value, state, err := l.next()
@@ -74,7 +75,7 @@ func (l *LazyList) next() (value Expr, state Expr, err error) {
 	}
 	res, ok := expr.(*Sexpr)
 	if !ok {
-		return nil, nil, fmt.Errorf("Iterator should return list, found: %v", expr.Repr())
+		return expr, expr, nil
 	}
 	if len(res.List) == 0 {
 		// list is finished
