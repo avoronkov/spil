@@ -194,6 +194,51 @@ func (f *FuncRuntime) lastExpr(e Expr) (Expr, error) {
 				}
 				return f.lastExpr(a.List[3])
 			}
+			if name == "do" {
+				if len(a.List) < 2 {
+					return nil, fmt.Errorf("do: empty body")
+				}
+				if len(a.List) > 2 {
+					for _, st := range a.List[1 : len(a.List)-1] {
+						if _, err := f.evalExpr(st); err != nil {
+							return nil, err
+						}
+					}
+				}
+				return f.lastExpr(a.List[len(a.List)-1])
+			}
+			if name == "and" {
+				for _, arg := range a.List[1:] {
+					res, err := f.evalExpr(arg)
+					if err != nil {
+						return nil, err
+					}
+					boolRes, ok := res.(Bool)
+					if !ok {
+						return nil, fmt.Errorf("and: rrgument %v should evaluate to boolean value, actual %v", arg, res)
+					}
+					if !bool(boolRes) {
+						return Bool(false), nil
+					}
+				}
+				return Bool(true), nil
+			}
+			if name == "or" {
+				for _, arg := range a.List[1:] {
+					res, err := f.evalExpr(arg)
+					if err != nil {
+						return nil, err
+					}
+					boolRes, ok := res.(Bool)
+					if !ok {
+						return nil, fmt.Errorf("and: rrgument %v should evaluate to boolean value, actual %v", arg, res)
+					}
+					if bool(boolRes) {
+						return Bool(true), nil
+					}
+				}
+				return Bool(false), nil
+			}
 			if name == "set" {
 				tail, _ := a.Tail()
 				if err := f.setVar(tail.(*Sexpr)); err != nil {
@@ -208,6 +253,10 @@ func (f *FuncRuntime) lastExpr(e Expr) (Expr, error) {
 			if name == "lambda" {
 				tail, _ := a.Tail()
 				return f.evalLambda(tail.(*Sexpr))
+			}
+			if name == "apply" {
+				tail, _ := a.Tail()
+				return f.evalApply(tail.(*Sexpr))
 			}
 		}
 
@@ -354,6 +403,30 @@ func (f *FuncRuntime) replaceVars(st []Expr) (res []Expr) {
 		}
 	}
 	return res
+}
+
+func (f *FuncRuntime) evalApply(se *Sexpr) (Expr, error) {
+	if len(se.List) != 2 {
+		return nil, fmt.Errorf("apply expects function with list of arguments")
+	}
+	res, err := f.evalExpr(se.List[1])
+	if err != nil {
+		return nil, err
+	}
+	args, ok := res.(List)
+	if !ok {
+		return nil, fmt.Errorf("apply expects result to be a list of argument")
+	}
+	cmd := []Expr{se.List[0]}
+	for !args.Empty() {
+		h, _ := args.Head()
+		cmd = append(cmd, h)
+		args, _ = args.Tail()
+	}
+
+	return &Sexpr{
+		List: cmd,
+	}, nil
 }
 
 func matchArgs(argfmt Expr, args []Expr) (result bool) {
