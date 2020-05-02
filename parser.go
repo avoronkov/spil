@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"io"
-	"strconv"
 	"strings"
 	"unicode"
 )
@@ -16,6 +15,7 @@ var (
 type Parser struct {
 	scanner *bufio.Scanner
 	tokens  []string
+	bigint  bool
 }
 
 func NewParser(r io.Reader) *Parser {
@@ -24,6 +24,10 @@ func NewParser(r io.Reader) *Parser {
 	return &Parser{
 		scanner: scanner,
 	}
+}
+
+func (p *Parser) UseBigInt(v bool) {
+	p.bigint = true
 }
 
 func (p *Parser) NextExpr() (Expr, error) {
@@ -176,10 +180,11 @@ func (p *Parser) prepareTokens() error {
 	return nil
 }
 
-func (p *Parser) parseInt(token string) (Int, bool) {
-	n, err := strconv.ParseInt(token, 10, 64)
-	if err != nil {
-		return nil, false
+func (p *Parser) parseInt(token string) (value Int, ok bool) {
+	if !p.bigint {
+		value, ok = ParseInt64(token)
+	} else {
+		value, ok = ParseBigInt(token)
 	}
-	return Int64(n), true
+	return
 }
