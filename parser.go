@@ -18,11 +18,12 @@ type Parser struct {
 	bigint  bool
 }
 
-func NewParser(r io.Reader) *Parser {
+func NewParser(r io.Reader, bigint bool) *Parser {
 	scanner := bufio.NewScanner(r)
 	scanner.Split(bufio.ScanLines)
 	return &Parser{
 		scanner: scanner,
+		bigint:  bigint,
 	}
 }
 

@@ -10,10 +10,17 @@ import (
 	"path/filepath"
 )
 
-var trace = false
+var (
+	trace  bool
+	bigint bool
+)
 
 func init() {
 	flag.BoolVar(&trace, "trace", false, "trace function calls")
+	flag.BoolVar(&trace, "t", false, "trace function calls (shorthand)")
+
+	flag.BoolVar(&bigint, "big", false, "use big math")
+	flag.BoolVar(&bigint, "b", false, "use big math (shorthand)")
 }
 
 func doMain() int {
@@ -30,6 +37,7 @@ func doMain() int {
 	log.Printf("builtin: %v\n", builtinDir)
 
 	in := NewInterpreter(os.Stdout)
+	in.UseBigInt(bigint)
 	if err := in.LoadBuiltin(builtinDir); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 	}

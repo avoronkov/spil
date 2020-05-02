@@ -13,11 +13,11 @@ type Interpret struct {
 	vars     map[string]Expr
 	funcs    map[string]Evaler
 	mainBody []Expr
+	bigint   bool
 }
 
 func NewInterpreter(w io.Writer) *Interpret {
 	i := &Interpret{
-		// parser: NewParser(r),
 		output: w,
 		vars:   make(map[string]Expr),
 	}
@@ -38,6 +38,10 @@ func NewInterpreter(w io.Writer) *Interpret {
 		"empty":  EvalerFunc(FEmpty),
 	}
 	return i
+}
+
+func (i *Interpret) UseBigInt(v bool) {
+	i.bigint = v
 }
 
 func (i *Interpret) LoadBuiltin(dir string) error {
@@ -68,7 +72,7 @@ func (i *Interpret) LoadBuiltin(dir string) error {
 }
 
 func (i *Interpret) parse(input io.Reader) error {
-	parser := NewParser(input)
+	parser := NewParser(input, i.bigint)
 L:
 	for {
 		expr, err := parser.NextExpr()

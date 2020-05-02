@@ -27,7 +27,7 @@ func TestNextToken(t *testing.T) {
 
 	for _, test := range testdata {
 		t.Run(test.input, func(t *testing.T) {
-			p := NewParser(strings.NewReader(test.input))
+			p := NewParser(strings.NewReader(test.input), false)
 			var tokens []string
 			for {
 				tok, err := p.nextToken()
