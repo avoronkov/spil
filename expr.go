@@ -10,16 +10,6 @@ type Expr interface {
 	Repr() string
 }
 
-type Int int64
-
-func (i Int) String() string {
-	return fmt.Sprintf("%d", int64(i))
-}
-
-func (i Int) Repr() string {
-	return fmt.Sprintf("{Int: %d}", int64(i))
-}
-
 type Str string
 
 func (s Str) String() string {

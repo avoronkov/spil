@@ -13,14 +13,14 @@ func TestMatchArgs(t *testing.T) {
 	}{
 		{QEmpty, []Expr{}, true},
 		{QList(QEmpty), []Expr{QEmpty}, true},
-		{QList(QEmpty), []Expr{QList(Int(1))}, false},
-		{QList(Ident("x"), QEmpty), []Expr{QList(Int(1)), QEmpty}, true},
-		{Ident("args"), []Expr{QList(Int(1)), QEmpty}, true},
-		{QList(Ident("x"), QEmpty), []Expr{QList(Int(1)), QEmpty}, true},
-		{QList(Ident("x"), Ident("x")), []Expr{Int(1), Int(1)}, true},
-		{QList(Ident("x"), Ident("x")), []Expr{Int(1), Int(2)}, false},
-		{QList(Ident("x"), Int(1)), []Expr{Int(1), Int(2)}, false},
-		{QList(Int(1)), []Expr{Str("hello")}, false},
+		{QList(QEmpty), []Expr{QList(Int64(1))}, false},
+		{QList(Ident("x"), QEmpty), []Expr{QList(Int64(1)), QEmpty}, true},
+		{Ident("args"), []Expr{QList(Int64(1)), QEmpty}, true},
+		{QList(Ident("x"), QEmpty), []Expr{QList(Int64(1)), QEmpty}, true},
+		{QList(Ident("x"), Ident("x")), []Expr{Int64(1), Int64(1)}, true},
+		{QList(Ident("x"), Ident("x")), []Expr{Int64(1), Int64(2)}, false},
+		{QList(Ident("x"), Int64(1)), []Expr{Int64(1), Int64(2)}, false},
+		{QList(Int64(1)), []Expr{Str("hello")}, false},
 		{QList(QEmpty), []Expr{makeEmptyGen()}, true},
 	}
 	for i, test := range tests {

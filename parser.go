@@ -47,8 +47,8 @@ func (p *Parser) NextExpr() (Expr, error) {
 	if token == "'F" {
 		return Bool(false), nil
 	}
-	if n, err := strconv.Atoi(token); err == nil {
-		return Int(n), nil
+	if n, ok := p.parseInt(token); ok {
+		return n, nil
 	}
 	if strings.HasPrefix(token, `"`) && strings.HasPrefix(token, `"`) {
 		return Str(token[1 : len(token)-1]), nil
@@ -88,8 +88,8 @@ func (p *Parser) nextSexpr() (*Sexpr, error) {
 			list = append(list, Bool(false))
 			continue
 		}
-		if n, err := strconv.Atoi(token); err == nil {
-			list = append(list, Int(n))
+		if n, ok := p.parseInt(token); ok {
+			list = append(list, n)
 			continue
 		}
 		if strings.HasPrefix(token, `"`) && strings.HasPrefix(token, `"`) {
@@ -174,4 +174,12 @@ func (p *Parser) prepareTokens() error {
 	}
 	p.tokens = tokens
 	return nil
+}
+
+func (p *Parser) parseInt(token string) (Int, bool) {
+	n, err := strconv.ParseInt(token, 10, 64)
+	if err != nil {
+		return nil, false
+	}
+	return Int64(n), true
 }
