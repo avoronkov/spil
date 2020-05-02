@@ -3,18 +3,21 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 )
 
 type Interpret struct {
-	parser *Parser
-	output io.Writer
-	vars   map[string]Expr
-	funcs  map[string]Evaler
+	// parser *Parser
+	output   io.Writer
+	vars     map[string]Expr
+	funcs    map[string]Evaler
+	mainBody []Expr
 }
 
-func NewInterpreter(r io.Reader, w io.Writer) *Interpret {
+func NewInterpreter(w io.Writer) *Interpret {
 	i := &Interpret{
-		parser: NewParser(r),
+		// parser: NewParser(r),
 		output: w,
 		vars:   make(map[string]Expr),
 	}
@@ -37,12 +40,38 @@ func NewInterpreter(r io.Reader, w io.Writer) *Interpret {
 	return i
 }
 
-func (i *Interpret) Run() error {
-	var mainBody []Expr
-	// Parsing LOOP
+func (i *Interpret) LoadBuiltin(dir string) error {
+	files, err := filepath.Glob(filepath.Join(dir, "*.lisp"))
+	if err != nil {
+		return fmt.Errorf("Error while loading builtins: %w", err)
+	}
+	if len(files) == 0 {
+		return fmt.Errorf("Builtin source files not found in %v", dir)
+	}
+	for _, file := range files {
+		err := func() error {
+			f, err := os.Open(file)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			if err := i.parse(f); err != nil {
+				return err
+			}
+			return nil
+		}()
+		if err != nil {
+			return fmt.Errorf("Error whire loading %v: %w", file, err)
+		}
+	}
+	return nil
+}
+
+func (i *Interpret) parse(input io.Reader) error {
+	parser := NewParser(input)
 L:
 	for {
-		expr, err := i.parser.NextExpr()
+		expr, err := parser.NextExpr()
 		if err == io.EOF {
 			break L
 		}
@@ -68,11 +97,18 @@ L:
 				}
 			}
 		}
-		mainBody = append(mainBody, expr)
+		i.mainBody = append(i.mainBody, expr)
+	}
+	return nil
+}
+
+func (i *Interpret) Run(input io.Reader) error {
+	if err := i.parse(input); err != nil {
+		return err
 	}
 	// Interpreter LOOP
 	mainInterpret := NewFuncInterpret(i, "__main__")
-	if err := mainInterpret.AddImpl(QEmpty, mainBody); err != nil {
+	if err := mainInterpret.AddImpl(QEmpty, i.mainBody); err != nil {
 		return err
 	}
 	_, err := mainInterpret.Eval(nil)

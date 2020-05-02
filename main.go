@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 )
 
 var trace = false
@@ -19,6 +20,18 @@ func doMain() int {
 	flag.Parse()
 	if !trace {
 		log.SetOutput(ioutil.Discard)
+	}
+
+	builtinDir, err := getBuiltinDir()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		return 1
+	}
+	log.Printf("builtin: %v\n", builtinDir)
+
+	in := NewInterpreter(os.Stdout)
+	if err := in.LoadBuiltin(builtinDir); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 	}
 
 	var input io.Reader
@@ -34,8 +47,7 @@ func doMain() int {
 		input = os.Stdin
 	}
 
-	in := NewInterpreter(input, os.Stdout)
-	if err := in.Run(); err != nil {
+	if err := in.Run(input); err != nil {
 		fmt.Fprint(os.Stderr, err)
 		return 1
 	}
@@ -44,4 +56,12 @@ func doMain() int {
 
 func main() {
 	os.Exit(doMain())
+}
+
+func getBuiltinDir() (string, error) {
+	binPath, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(filepath.Dir(binPath), "builtin"), nil
 }
