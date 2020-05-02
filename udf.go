@@ -122,7 +122,7 @@ L:
 				}
 				head, _ := lst.Head()
 				hident, ok := head.(Ident)
-				if !ok || string(hident) != f.fi.name {
+				if !ok || (string(hident) != f.fi.name && string(hident) != "self") {
 					return f.evalFunc(lst)
 				}
 				// Tail call!

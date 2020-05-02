@@ -215,3 +215,10 @@ func FAppend(args []Expr) (Expr, error) {
 		Quoted: l.Quoted,
 	}, nil
 }
+
+func FList(args []Expr) (Expr, error) {
+	return &Sexpr{
+		List:   args,
+		Quoted: true,
+	}, nil
+}

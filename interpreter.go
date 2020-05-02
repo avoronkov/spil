@@ -31,6 +31,7 @@ func NewInterpreter(r io.Reader, w io.Writer) *Interpret {
 		"head":   EvalerFunc(FHead),
 		"tail":   EvalerFunc(FTail),
 		"append": EvalerFunc(FAppend),
+		"list":   EvalerFunc(FList),
 		"empty":  EvalerFunc(FEmpty),
 	}
 	return i

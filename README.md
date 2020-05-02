@@ -8,8 +8,10 @@
 
 - pass command line arguments to the command
 
-- lazy lists (?)
+- [+] lazy lists
 
 - apply
 
 - anonymous functions (?)
+
+- function "list"
