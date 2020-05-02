@@ -140,7 +140,16 @@ func FEq(args []Expr) (Expr, error) {
 	case *Sexpr:
 		b, ok := args[1].(*Sexpr)
 		if ok {
-			return Bool(a.Repr() == b.Repr()), nil
+			if len(a.List) != len(b.List) {
+				return Bool(false), nil
+			}
+			for i, first := range a.List {
+				cmp, _ := FEq([]Expr{first, b.List[i]})
+				if cmp != Bool(true) {
+					return Bool(false), nil
+				}
+			}
+			return Bool(true), nil
 		}
 		if !a.Empty() {
 			return nil, fmt.Errorf("FEq: Expected second argument to be List, found %v", args[1].Repr())
