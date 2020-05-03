@@ -92,6 +92,20 @@ L:
 			}
 			head, _ := a.Head()
 			if name, ok := head.(Ident); ok {
+				switch name {
+				case "func", "def":
+					tail, _ := a.Tail()
+					if err := i.defineFunc(tail.(*Sexpr)); err != nil {
+						return err
+					}
+					continue L
+				case "use":
+					tail, _ := a.Tail()
+					if err := i.use(tail.(*Sexpr).List); err != nil {
+						return err
+					}
+					continue L
+				}
 				if name == "func" || name == "def" {
 					tail, _ := a.Tail()
 					if err := i.defineFunc(tail.(*Sexpr)); err != nil {
@@ -144,6 +158,23 @@ func (i *Interpret) defineFunc(se *Sexpr) error {
 		i.funcs[fname] = fi
 	}
 	return fi.AddImpl(se.List[1], se.List[2:])
+}
+
+func (i *Interpret) use(args []Expr) error {
+	if len(args) != 1 {
+		return fmt.Errorf("'use' expected one argument, found: %v", args)
+	}
+	module := args[0]
+	switch a := module.(type) {
+	case Str:
+		f, err := os.Open(string(a))
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		return i.parse(f)
+	}
+	return fmt.Errorf("Unexpected argument type to 'use': %v", module.Repr())
 }
 
 func (in *Interpret) FPrint(args []Expr) (Expr, error) {

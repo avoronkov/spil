@@ -12,6 +12,7 @@
 			 (self (tail _1))))))
 	 (gen filt lst))
 
+
 ;; lazy map
 (def map (fn lst)
 	 (set
@@ -21,6 +22,7 @@
 		   '()
 		   (list (fn (head _1)) (tail _1)))))
 	 (gen iter lst))
+
 
 ;; take first n values from list
 (def take (n lst)
@@ -39,6 +41,7 @@
 ; (def take (0 lst acc) acc)
 ; (def take (n lst acc) (take (- n 1) (tail lst) (append acc (head lst))))
 
+
 ;; take elements from list while condition is true
 (def take-while (pred lst) 
 	 (set
@@ -48,3 +51,13 @@
 		   '()
 		   (list (head _1) (tail _1)))))
 	 (gen iter lst))
+
+
+;; drop first n values from list
+(def drop (0 lst) lst)
+(def drop (n lst) (drop (- n 1) (tail lst)))
+
+
+;; take nth element from list.
+;; Elements numeration is started from 1 (!).
+(def nth (n lst) (head (drop (- n 1) lst)))
