@@ -35,7 +35,7 @@ func FMinus(args []Expr) (Expr, error) {
 	for i, arg := range args {
 		a, ok := arg.(Int)
 		if !ok {
-			return nil, fmt.Errorf("FMinus: expected integer argument, found %v", arg.Repr())
+			return nil, fmt.Errorf("FMinus: expected integer argument in position %v, found %v", i, arg.Repr())
 		}
 		if i == 0 {
 			result = a
@@ -93,6 +93,21 @@ func FLess(args []Expr) (Expr, error) {
 	return Bool(a.Less(b)), nil
 }
 
+func FLessEq(args []Expr) (Expr, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("FLess: expected 2 arguments, found %v", args)
+	}
+	a, ok := args[0].(Int)
+	if !ok {
+		return nil, fmt.Errorf("FLess: first argument should be integer, found %v", args[0].Repr())
+	}
+	b, ok := args[1].(Int)
+	if !ok {
+		return nil, fmt.Errorf("FLess: second argument should be integer, found %v", args[1].Repr())
+	}
+	return Bool(!b.Less(a)), nil
+}
+
 func FMore(args []Expr) (Expr, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("FMore: expected 2 arguments, found %v", args)
@@ -106,6 +121,20 @@ func FMore(args []Expr) (Expr, error) {
 		return nil, fmt.Errorf("FMore: second argument should be integer, found %v", args[1].Repr())
 	}
 	return Bool(b.Less(a)), nil
+}
+func FMoreEq(args []Expr) (Expr, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("FMore: expected 2 arguments, found %v", args)
+	}
+	a, ok := args[0].(Int)
+	if !ok {
+		return nil, fmt.Errorf("FMore: first argument should be integer, found %v", args[0].Repr())
+	}
+	b, ok := args[1].(Int)
+	if !ok {
+		return nil, fmt.Errorf("FMore: second argument should be integer, found %v", args[1].Repr())
+	}
+	return Bool(!a.Less(b)), nil
 }
 
 func FEq(args []Expr) (Expr, error) {

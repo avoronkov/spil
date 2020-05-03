@@ -63,6 +63,26 @@
 (def nth (n lst) (head (drop (- n 1) lst)))
 
 
+(def first  (lst) (nth 1 lst))
+(def second (lst) (nth 2 lst))
+(def third  (lst) (nth 3 lst))
+
+
 ;; reduce
 (def reduce (fn '() acc) acc)
 (def reduce (fn lst acc) (reduce fn (tail lst) (fn (head lst) acc)))
+
+
+;; lazy concat
+(def concat lists
+	 ; return one element at the time
+	 (set iter
+		  (lambda 
+			(set h (first _1))
+			(set t (second _1))
+			(if (= h '())
+			  (if (empty t)
+				'()
+				(self (list (head t) (tail t))))
+			  (list (head h) (list (tail h) t)))))
+	 (gen iter (list (head lists) (tail lists))))
