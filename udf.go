@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"regexp"
+	"strings"
 )
 
 // User-defined functions
@@ -10,7 +12,7 @@ import (
 type FuncInterpret struct {
 	interpret *Interpret
 	name      string
-	bodies    []FuncImpl
+	bodies    []*FuncImpl
 }
 
 type FuncImpl struct {
@@ -22,6 +24,27 @@ type FuncImpl struct {
 	results map[string]Expr
 }
 
+func NewFuncImpl(argfmt Expr, body []Expr, memo bool) *FuncImpl {
+	i := &FuncImpl{
+		argfmt: argfmt,
+		body:   body,
+		memo:   memo,
+	}
+	if memo {
+		i.results = make(map[string]Expr)
+	}
+	return i
+}
+
+func (i *FuncImpl) RememberResult(name string, args []Expr, result Expr) {
+	// log.Printf("%v: rememberRusult %v -> %v", name, args, result)
+	keyArgs := keyOfArgs(args)
+	if _, ok := i.results[keyArgs]; ok {
+		panic(fmt.Errorf("%v: already have saved result for arguments %v (%v)", name, args, keyArgs))
+	}
+	i.results[keyArgs] = result
+}
+
 func NewFuncInterpret(i *Interpret, name string) *FuncInterpret {
 	return &FuncInterpret{
 		interpret: i,
@@ -31,28 +54,16 @@ func NewFuncInterpret(i *Interpret, name string) *FuncInterpret {
 
 func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr, memo bool) error {
 	if argfmt == nil {
-		f.bodies = append(f.bodies, FuncImpl{
-			argfmt: nil,
-			body:   body,
-			memo:   memo,
-		})
+		f.bodies = append(f.bodies, NewFuncImpl(nil, body, memo))
 		return nil
 	}
 	switch argfmt.(type) {
 	case Ident:
 		// pass arguments as list with specified name
-		f.bodies = append(f.bodies, FuncImpl{
-			argfmt: argfmt,
-			body:   body,
-			memo:   memo,
-		})
+		f.bodies = append(f.bodies, NewFuncImpl(argfmt, body, memo))
 	case *Sexpr:
 		// bind arguments
-		f.bodies = append(f.bodies, FuncImpl{
-			argfmt: argfmt,
-			body:   body,
-			memo:   memo,
-		})
+		f.bodies = append(f.bodies, NewFuncImpl(argfmt, body, memo))
 	default:
 		return fmt.Errorf("Expected arguments signature, found: %v", argfmt)
 	}
@@ -60,17 +71,22 @@ func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr, memo bool) error {
 }
 
 func (f *FuncInterpret) Eval(args []Expr) (Expr, error) {
+	// log.Printf("%v: Eval(%v)", f.name, args)
 	run := NewFuncRuntime(f)
-	body, err := run.bind(args)
+	impl, result, err := run.bind(args)
 	if err != nil {
 		return nil, err
 	}
-	return run.Eval(body)
+	if result != nil {
+		return result, nil
+	}
+	return run.Eval(impl)
 }
 
 type FuncRuntime struct {
 	fi   *FuncInterpret
 	vars map[string]Expr
+	args []Expr
 }
 
 func NewFuncRuntime(fi *FuncInterpret) *FuncRuntime {
@@ -79,31 +95,48 @@ func NewFuncRuntime(fi *FuncInterpret) *FuncRuntime {
 	}
 }
 
-func (f *FuncRuntime) bind(args []Expr) ([]Expr, error) {
+// TODO: better serialization
+func keyOfArgs(args []Expr) string {
+	b := &strings.Builder{}
+	for _, arg := range args {
+		io.WriteString(b, arg.Repr()+" ")
+	}
+	return b.String()
+}
+
+func (f *FuncRuntime) bind(args []Expr) (impl *FuncImpl, result Expr, err error) {
+	// log.Printf("%v: bind args %v", f.fi.name, args)
 	f.vars = make(map[string]Expr)
-	var (
-		argfmt Expr
-		body   []Expr
-	)
 	argfmtFound := false
-	for _, impl := range f.fi.bodies {
-		if matchArgs(impl.argfmt, args) {
-			argfmt = impl.argfmt
-			body = impl.body
+	for idx, im := range f.fi.bodies {
+		if matchArgs(im.argfmt, args) {
+			impl = f.fi.bodies[idx]
+			// argfmt = impl.argfmt
+			// body = impl.body
 			argfmtFound = true
+			if im.memo {
+				keyArgs := keyOfArgs(args)
+				if res, ok := im.results[keyArgs]; ok {
+					// log.Printf("%v: bind returns result: %v -> %v", f.fi.name, args, res)
+					return nil, res, nil
+				}
+			}
 			break
 		}
 	}
 	if !argfmtFound {
-		return nil, fmt.Errorf("No matching function implementation for %v found", f.fi.name)
+		err = fmt.Errorf("No matching function implementation for %v found", f.fi.name)
+		return
 	}
-	if argfmt != nil {
-		switch a := argfmt.(type) {
+	// log.Printf("%v: bind impl.argfmt = %v", f.fi.name, impl.argfmt)
+	if impl.argfmt != nil {
+		switch a := impl.argfmt.(type) {
 		case Ident:
 			f.vars[string(a)] = &Sexpr{List: args, Quoted: true}
 		case *Sexpr:
 			if l := a.Len(); l != len(args) {
-				return nil, fmt.Errorf("Incorrect number of arguments to %v: expected %v, found %v", f.fi.name, l, len(args))
+				err = fmt.Errorf("Incorrect number of arguments to %v: expected %v, found %v", f.fi.name, l, len(args))
+				return
 			}
 			for i, ident := range a.List {
 				if iname, ok := ident.(Ident); ok {
@@ -117,15 +150,16 @@ func (f *FuncRuntime) bind(args []Expr) ([]Expr, error) {
 	for i, arg := range args {
 		f.vars[fmt.Sprintf("_%d", i+1)] = arg
 	}
-	return body, nil
+	f.args = args
+	return impl, nil, nil
 }
 
-func (f *FuncRuntime) Eval(body []Expr) (res Expr, err error) {
+func (f *FuncRuntime) Eval(impl *FuncImpl) (res Expr, err error) {
 L:
 	for {
-		last := len(body) - 1
-		// log.Printf("Function %q: eval %v over %+v", f.fi.name, body, f.vars)
-		for i, expr := range body {
+		last := len(impl.body) - 1
+		// // log.Printf("Function %q: eval %v over %+v", f.fi.name, body, f.vars)
+		for i, expr := range impl.body {
 			if i == last {
 				// check for tail call
 				e, err := f.lastExpr(expr)
@@ -134,16 +168,35 @@ L:
 				}
 				lst, ok := e.(*Sexpr)
 				if !ok {
+					if impl.memo {
+						// lets remenber the result
+						// log.Printf("%v: remember result 1", f.fi.name)
+						impl.RememberResult(f.fi.name, f.args, e)
+					}
 					// nothing to evaluate
 					return e, nil
 				}
 				if lst.Quoted || lst.Len() == 0 {
+					if impl.memo {
+						// lets remenber the result
+						// log.Printf("%v: remember result 2", f.fi.name)
+						impl.RememberResult(f.fi.name, f.args, lst)
+					}
 					return lst, nil
 				}
 				head, _ := lst.Head()
 				hident, ok := head.(Ident)
 				if !ok || (string(hident) != f.fi.name && string(hident) != "self") {
-					return f.evalFunc(lst)
+					result, err := f.evalFunc(lst)
+					if err != nil {
+						return nil, err
+					}
+					if impl.memo {
+						// lets remenber the result
+						// log.Printf("%v: remember result 3", f.fi.name)
+						impl.RememberResult(f.fi.name, f.args, result)
+					}
+					return result, nil
 				}
 				// Tail call!
 				t, _ := lst.Tail()
@@ -157,9 +210,13 @@ L:
 					}
 					args = append(args, arg)
 				}
-				body, err = f.bind(args)
+				var result Expr
+				impl, result, err = f.bind(args)
 				if err != nil {
 					return nil, err
+				}
+				if result != nil {
+					return result, nil
 				}
 				continue L
 			} else {
