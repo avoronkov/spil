@@ -61,3 +61,8 @@
 ;; take nth element from list.
 ;; Elements numeration is started from 1 (!).
 (def nth (n lst) (head (drop (- n 1) lst)))
+
+
+;; reduce
+(def reduce (fn '() acc) acc)
+(def reduce (fn lst acc) (reduce fn (tail lst) (fn (head lst) acc)))

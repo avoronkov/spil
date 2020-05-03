@@ -26,6 +26,10 @@ func NewFuncInterpret(i *Interpret, name string) *FuncInterpret {
 }
 
 func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr) error {
+	if argfmt == nil {
+		f.bodies = append(f.bodies, FuncImpl{nil, body})
+		return nil
+	}
 	switch argfmt.(type) {
 	case Ident:
 		// pass arguments as list with specified name
@@ -376,7 +380,7 @@ func (f *FuncRuntime) evalLambda(se *Sexpr) (Expr, error) {
 	lambdaCount++
 	fi := NewFuncInterpret(f.fi.interpret, name)
 	body := f.replaceVars(se.List)
-	fi.AddImpl(QList(Ident("__args")), body)
+	fi.AddImpl(nil, body)
 	f.fi.interpret.funcs[name] = fi
 	return Ident(name), nil
 }
