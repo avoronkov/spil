@@ -31,6 +31,7 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 		"-":      EvalerFunc(FMinus),
 		"*":      EvalerFunc(FMultiply),
 		"/":      EvalerFunc(FDiv),
+		"mod":    EvalerFunc(FMod),
 		"<":      EvalerFunc(FLess),
 		"<=":     EvalerFunc(FLessEq),
 		">":      EvalerFunc(FMore),
@@ -108,22 +109,19 @@ L:
 			head, _ := a.Head()
 			if name, ok := head.(Ident); ok {
 				switch name {
-				case "func", "def":
+				case "func", "def", "func'", "def'":
+					memo := false
+					if name == "func'" || name == "def'" {
+						memo = true
+					}
 					tail, _ := a.Tail()
-					if err := i.defineFunc(tail.(*Sexpr)); err != nil {
+					if err := i.defineFunc(tail.(*Sexpr), memo); err != nil {
 						return err
 					}
 					continue L
 				case "use":
 					tail, _ := a.Tail()
 					if err := i.use(tail.(*Sexpr).List); err != nil {
-						return err
-					}
-					continue L
-				}
-				if name == "func" || name == "def" {
-					tail, _ := a.Tail()
-					if err := i.defineFunc(tail.(*Sexpr)); err != nil {
 						return err
 					}
 					continue L
@@ -148,7 +146,7 @@ func (i *Interpret) Run(input io.Reader) error {
 
 	// Interpreter LOOP
 	mainInterpret := NewFuncInterpret(i, "__main__")
-	if err := mainInterpret.AddImpl(QEmpty, i.mainBody); err != nil {
+	if err := mainInterpret.AddImpl(QEmpty, i.mainBody, false); err != nil {
 		return err
 	}
 	_, err := mainInterpret.Eval(nil)
@@ -156,7 +154,7 @@ func (i *Interpret) Run(input io.Reader) error {
 }
 
 // (func-name) args body...
-func (i *Interpret) defineFunc(se *Sexpr) error {
+func (i *Interpret) defineFunc(se *Sexpr, memo bool) error {
 	if se.Len() < 3 {
 		return fmt.Errorf("Not enough arguments for function definition: %v", se.Repr())
 	}
@@ -179,7 +177,8 @@ func (i *Interpret) defineFunc(se *Sexpr) error {
 		fi = NewFuncInterpret(i, fname)
 		i.funcs[fname] = fi
 	}
-	return fi.AddImpl(se.List[1], se.List[2:])
+	// TODO
+	return fi.AddImpl(se.List[1], se.List[2:], memo)
 }
 
 func (i *Interpret) use(args []Expr) error {

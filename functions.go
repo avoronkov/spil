@@ -77,6 +77,20 @@ func FDiv(args []Expr) (Expr, error) {
 	}
 	return result, nil
 }
+func FMod(args []Expr) (Expr, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("FMod: expected 2 arguments, found %v", args)
+	}
+	a, ok := args[0].(Int)
+	if !ok {
+		return nil, fmt.Errorf("FMod: first argument should be integer, found %v", args[0].Repr())
+	}
+	b, ok := args[1].(Int)
+	if !ok {
+		return nil, fmt.Errorf("FMod: second argument should be integer, found %v", args[1].Repr())
+	}
+	return a.Mod(b), nil
+}
 
 func FLess(args []Expr) (Expr, error) {
 	if len(args) != 2 {
@@ -122,6 +136,7 @@ func FMore(args []Expr) (Expr, error) {
 	}
 	return Bool(b.Less(a)), nil
 }
+
 func FMoreEq(args []Expr) (Expr, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("FMore: expected 2 arguments, found %v", args)

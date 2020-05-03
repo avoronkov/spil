@@ -16,6 +16,10 @@ type FuncInterpret struct {
 type FuncImpl struct {
 	argfmt Expr
 	body   []Expr
+	// Do we need to remenber function results?
+	memo bool
+	// Function results: args.Repr() -> Result
+	results map[string]Expr
 }
 
 func NewFuncInterpret(i *Interpret, name string) *FuncInterpret {
@@ -25,18 +29,30 @@ func NewFuncInterpret(i *Interpret, name string) *FuncInterpret {
 	}
 }
 
-func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr) error {
+func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr, memo bool) error {
 	if argfmt == nil {
-		f.bodies = append(f.bodies, FuncImpl{nil, body})
+		f.bodies = append(f.bodies, FuncImpl{
+			argfmt: nil,
+			body:   body,
+			memo:   memo,
+		})
 		return nil
 	}
 	switch argfmt.(type) {
 	case Ident:
 		// pass arguments as list with specified name
-		f.bodies = append(f.bodies, FuncImpl{argfmt, body})
+		f.bodies = append(f.bodies, FuncImpl{
+			argfmt: argfmt,
+			body:   body,
+			memo:   memo,
+		})
 	case *Sexpr:
 		// bind arguments
-		f.bodies = append(f.bodies, FuncImpl{argfmt, body})
+		f.bodies = append(f.bodies, FuncImpl{
+			argfmt: argfmt,
+			body:   body,
+			memo:   memo,
+		})
 	default:
 		return fmt.Errorf("Expected arguments signature, found: %v", argfmt)
 	}
@@ -380,7 +396,7 @@ func (f *FuncRuntime) evalLambda(se *Sexpr) (Expr, error) {
 	lambdaCount++
 	fi := NewFuncInterpret(f.fi.interpret, name)
 	body := f.replaceVars(se.List)
-	fi.AddImpl(nil, body)
+	fi.AddImpl(nil, body, false)
 	f.fi.interpret.funcs[name] = fi
 	return Ident(name), nil
 }

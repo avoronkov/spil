@@ -12,6 +12,7 @@ type Int interface {
 	Minus(Int) Int
 	Mult(Int) Int
 	Div(Int) Int
+	Mod(Int) Int
 	Less(Int) bool
 	Eq(Int) bool
 }
@@ -50,6 +51,10 @@ func (i Int64) Mult(a Int) Int {
 
 func (i Int64) Div(a Int) Int {
 	return Int64(i / a.(Int64))
+}
+
+func (i Int64) Mod(a Int) Int {
+	return Int64(i % a.(Int64))
 }
 
 func (i Int64) Less(a Int) bool {
@@ -104,6 +109,12 @@ func (i *BigInt) Mult(a Int) Int {
 func (i *BigInt) Div(a Int) Int {
 	res := &big.Int{}
 	res.Div(i.value, a.(*BigInt).value)
+	return &BigInt{res}
+}
+
+func (i *BigInt) Mod(a Int) Int {
+	res := &big.Int{}
+	res.Mod(i.value, a.(*BigInt).value)
 	return &BigInt{res}
 }
 
