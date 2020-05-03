@@ -13,13 +13,18 @@ type Interpret struct {
 	vars     map[string]Expr
 	funcs    map[string]Evaler
 	mainBody []Expr
-	bigint   bool
+
+	builtinDir string
+
+	parseInt func(token string) (Int, bool)
 }
 
-func NewInterpreter(w io.Writer) *Interpret {
+func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 	i := &Interpret{
-		output: w,
-		vars:   make(map[string]Expr),
+		output:     w,
+		builtinDir: builtinDir,
+		vars:       make(map[string]Expr),
+		parseInt:   ParseInt64,
 	}
 	i.funcs = map[string]Evaler{
 		"+":      EvalerFunc(FPlus),
@@ -41,10 +46,14 @@ func NewInterpreter(w io.Writer) *Interpret {
 }
 
 func (i *Interpret) UseBigInt(v bool) {
-	i.bigint = v
+	if v {
+		i.parseInt = ParseBigInt
+	} else {
+		i.parseInt = ParseInt64
+	}
 }
 
-func (i *Interpret) LoadBuiltin(dir string) error {
+func (i *Interpret) loadBuiltin(dir string) error {
 	files, err := filepath.Glob(filepath.Join(dir, "*.lisp"))
 	if err != nil {
 		return fmt.Errorf("Error while loading builtins: %w", err)
@@ -71,8 +80,12 @@ func (i *Interpret) LoadBuiltin(dir string) error {
 	return nil
 }
 
+func (i *Interpret) ParseInt(token string) (Int, bool) {
+	return i.parseInt(token)
+}
+
 func (i *Interpret) parse(input io.Reader) error {
-	parser := NewParser(input, i.bigint)
+	parser := NewParser(input, i)
 L:
 	for {
 		expr, err := parser.NextExpr()
@@ -124,6 +137,13 @@ func (i *Interpret) Run(input io.Reader) error {
 	if err := i.parse(input); err != nil {
 		return err
 	}
+	// load builtin last
+	if i.builtinDir != "" {
+		if err := i.loadBuiltin(i.builtinDir); err != nil {
+			return err
+		}
+	}
+
 	// Interpreter LOOP
 	mainInterpret := NewFuncInterpret(i, "__main__")
 	if err := mainInterpret.AddImpl(QEmpty, i.mainBody); err != nil {
@@ -173,8 +193,11 @@ func (i *Interpret) use(args []Expr) error {
 		}
 		defer f.Close()
 		return i.parse(f)
+	case Ident:
+		i.UseBigInt(true)
+		return nil
 	}
-	return fmt.Errorf("Unexpected argument type to 'use': %v", module.Repr())
+	return fmt.Errorf("Unexpected argument type to 'use': %v (%T)", module.Repr(), module)
 }
 
 func (in *Interpret) FPrint(args []Expr) (Expr, error) {

@@ -12,23 +12,30 @@ var (
 	UnexpectedEOF = errors.New("Unexpected EOF")
 )
 
+type IntParser interface {
+	ParseInt(token string) (Int, bool)
+}
+
+type IntParserFn func(token string) (Int, bool)
+
+func (f IntParserFn) ParseInt(token string) (Int, bool) {
+	return f(token)
+}
+
 type Parser struct {
 	scanner *bufio.Scanner
 	tokens  []string
-	bigint  bool
+
+	intParser IntParser
 }
 
-func NewParser(r io.Reader, bigint bool) *Parser {
+func NewParser(r io.Reader, intParser IntParser) *Parser {
 	scanner := bufio.NewScanner(r)
 	scanner.Split(bufio.ScanLines)
 	return &Parser{
-		scanner: scanner,
-		bigint:  bigint,
+		scanner:   scanner,
+		intParser: intParser,
 	}
-}
-
-func (p *Parser) UseBigInt(v bool) {
-	p.bigint = true
 }
 
 func (p *Parser) NextExpr() (Expr, error) {
@@ -52,7 +59,7 @@ func (p *Parser) NextExpr() (Expr, error) {
 	if token == "'F" {
 		return Bool(false), nil
 	}
-	if n, ok := p.parseInt(token); ok {
+	if n, ok := p.intParser.ParseInt(token); ok {
 		return n, nil
 	}
 	if strings.HasPrefix(token, `"`) && strings.HasPrefix(token, `"`) {
@@ -93,7 +100,7 @@ func (p *Parser) nextSexpr() (*Sexpr, error) {
 			list = append(list, Bool(false))
 			continue
 		}
-		if n, ok := p.parseInt(token); ok {
+		if n, ok := p.intParser.ParseInt(token); ok {
 			list = append(list, n)
 			continue
 		}
@@ -179,13 +186,4 @@ func (p *Parser) prepareTokens() error {
 	}
 	p.tokens = tokens
 	return nil
-}
-
-func (p *Parser) parseInt(token string) (value Int, ok bool) {
-	if !p.bigint {
-		value, ok = ParseInt64(token)
-	} else {
-		value, ok = ParseBigInt(token)
-	}
-	return
 }

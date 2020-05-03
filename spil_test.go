@@ -64,14 +64,15 @@ func checkInterpreter(t *testing.T, input, output string, builtin, bigint bool) 
 		t.Fatalf("Reading output file failed: %v", err)
 	}
 
-	buffer := &strings.Builder{}
-	in := NewInterpreter(buffer)
-	in.UseBigInt(bigint)
+	builtinDir := ""
 	if builtin {
-		if err := in.LoadBuiltin("./builtin"); err != nil {
-			t.Fatal(err)
-		}
+		builtinDir = "./builtin"
 	}
+
+	buffer := &strings.Builder{}
+	in := NewInterpreter(buffer, builtinDir)
+	in.UseBigInt(bigint)
+
 	if err := in.Run(fin); err != nil {
 		t.Fatalf("Interpreter Run() failed: %v", err)
 	}

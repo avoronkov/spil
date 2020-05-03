@@ -36,11 +36,8 @@ func doMain() int {
 	}
 	log.Printf("builtin: %v\n", builtinDir)
 
-	in := NewInterpreter(os.Stdout)
+	in := NewInterpreter(os.Stdout, builtinDir)
 	in.UseBigInt(bigint)
-	if err := in.LoadBuiltin(builtinDir); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-	}
 
 	var input io.Reader
 	if len(flag.Args()) >= 1 {

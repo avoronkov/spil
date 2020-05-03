@@ -20,10 +20,10 @@ type Int64 int64
 
 var _ Int = Int64(0)
 
-func ParseInt64(token string) (Int64, bool) {
+func ParseInt64(token string) (Int, bool) {
 	n, err := strconv.ParseInt(token, 10, 64)
 	if err != nil {
-		return Int64(0), false
+		return nil, false
 	}
 	return Int64(n), true
 }
@@ -66,7 +66,7 @@ type BigInt struct {
 
 var _ Int = (*BigInt)(nil)
 
-func ParseBigInt(token string) (*BigInt, bool) {
+func ParseBigInt(token string) (Int, bool) {
 	res := &big.Int{}
 	_, ok := res.SetString(token, 10)
 	if !ok {

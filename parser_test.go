@@ -32,7 +32,11 @@ func TestNextToken(t *testing.T) {
 				name += "-big"
 			}
 			t.Run(name, func(t *testing.T) {
-				p := NewParser(strings.NewReader(test.input), bigint)
+				parseInt := ParseInt64
+				if bigint {
+					parseInt = ParseBigInt
+				}
+				p := NewParser(strings.NewReader(test.input), IntParserFn(parseInt))
 				var tokens []string
 				for {
 					tok, err := p.nextToken()
