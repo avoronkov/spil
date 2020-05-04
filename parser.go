@@ -44,7 +44,7 @@ func (p *Parser) NextExpr() (Expr, error) {
 		return nil, err
 	}
 	if token == "(" || token == "'(" {
-		item, err := p.nextSexpr()
+		item, err := p.nextSexpr( /*quoted*/ token == "'(")
 		if err != nil {
 			return nil, err
 		}
@@ -68,7 +68,7 @@ func (p *Parser) NextExpr() (Expr, error) {
 	return Ident(token), nil
 }
 
-func (p *Parser) nextSexpr() (*Sexpr, error) {
+func (p *Parser) nextSexpr(quoted bool) (*Sexpr, error) {
 	var list []Expr
 	for {
 		token, err := p.nextToken()
@@ -82,12 +82,9 @@ func (p *Parser) nextSexpr() (*Sexpr, error) {
 			break
 		}
 		if token == "(" || token == "'(" || token == "\\(" {
-			item, err := p.nextSexpr()
+			item, err := p.nextSexpr(quoted || token == "'(")
 			if err != nil {
 				return nil, err
-			}
-			if token == "'(" {
-				item.Quoted = true
 			}
 			if token == "\\(" {
 				item.Lambda = true
@@ -113,7 +110,7 @@ func (p *Parser) nextSexpr() (*Sexpr, error) {
 		}
 		list = append(list, Ident(token))
 	}
-	return &Sexpr{List: list}, nil
+	return &Sexpr{List: list, Quoted: quoted}, nil
 }
 
 func (p *Parser) nextToken() (string, error) {
