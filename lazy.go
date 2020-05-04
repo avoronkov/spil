@@ -24,7 +24,18 @@ func NewLazyList(iter Evaler, state Expr) *LazyList {
 
 // String() should evaluate the whole list
 func (l *LazyList) String() string {
-	return "Lazy{...}"
+	if l.Empty() {
+		return "{Lazy: }"
+	}
+	h, _ := l.Head()
+	return fmt.Sprintf("{Lazy: %v}", h)
+}
+
+func (l *LazyList) Hash() (string, error) {
+	if l.Empty() {
+		return l.String(), nil
+	}
+	return "", fmt.Errorf("Hash is not applicable to non-empty lazy lists")
 }
 
 func (l *LazyList) Print(w io.Writer) {

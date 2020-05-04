@@ -11,6 +11,7 @@ type Expr interface {
 	// Repr() string
 	// Write yourself into writer
 	Print(io.Writer)
+	Hash() (string, error)
 }
 
 type Str string
@@ -19,6 +20,10 @@ var _ Expr = Str("")
 
 func (s Str) String() string {
 	return fmt.Sprintf("{Str: %q}", string(s))
+}
+
+func (s Str) Hash() (string, error) {
+	return s.String(), nil
 }
 
 func (s Str) Print(w io.Writer) {
@@ -37,6 +42,10 @@ func (i Ident) String() string {
 	return fmt.Sprintf("{Ident: %v}", string(i))
 }
 
+func (i Ident) Hash() (string, error) {
+	return i.String(), nil
+}
+
 func (i Ident) Print(w io.Writer) {
 	io.WriteString(w, "_"+string(i))
 }
@@ -45,19 +54,23 @@ type Bool bool
 
 var _ Expr = Bool(false)
 
-func (i Bool) Print(w io.Writer) {
-	if bool(i) {
-		io.WriteString(w, "true")
-	} else {
-		io.WriteString(w, "false")
-	}
-}
-
 func (i Bool) String() string {
 	if bool(i) {
 		return "{Bool: 'T}"
 	} else {
 		return "{Bool: 'F}"
+	}
+}
+
+func (i Bool) Hash() (string, error) {
+	return i.String(), nil
+}
+
+func (i Bool) Print(w io.Writer) {
+	if bool(i) {
+		io.WriteString(w, "true")
+	} else {
+		io.WriteString(w, "false")
 	}
 }
 
@@ -112,6 +125,24 @@ func (s *Sexpr) String() string {
 	}
 	fmt.Fprintf(b, "}")
 	return b.String()
+}
+
+func (s *Sexpr) Hash() (string, error) {
+	b := &strings.Builder{}
+	if s.Quoted {
+		fmt.Fprintf(b, "{S':")
+	} else {
+		fmt.Fprintf(b, "{S:")
+	}
+	for _, item := range s.List {
+		hash, err := item.Hash()
+		if err != nil {
+			return "", err
+		}
+		fmt.Fprintf(b, " %v", hash)
+	}
+	fmt.Fprintf(b, "}")
+	return b.String(), nil
 }
 
 func (s *Sexpr) Len() int {

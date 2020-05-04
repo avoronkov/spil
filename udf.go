@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"regexp"
 	"strings"
 )
@@ -38,7 +39,11 @@ func NewFuncImpl(argfmt Expr, body []Expr, memo bool) *FuncImpl {
 
 func (i *FuncImpl) RememberResult(name string, args []Expr, result Expr) {
 	// log.Printf("%v: rememberRusult %v -> %v", name, args, result)
-	keyArgs := keyOfArgs(args)
+	keyArgs, err := keyOfArgs(args)
+	if err != nil {
+		log.Printf("Cannot rememer result for %v: %v", args, err)
+		return
+	}
 	if _, ok := i.results[keyArgs]; ok {
 		panic(fmt.Errorf("%v: already have saved result for arguments %v (%v)", name, args, keyArgs))
 	}
@@ -95,13 +100,16 @@ func NewFuncRuntime(fi *FuncInterpret) *FuncRuntime {
 	}
 }
 
-// TODO: better serialization
-func keyOfArgs(args []Expr) string {
+func keyOfArgs(args []Expr) (string, error) {
 	b := &strings.Builder{}
 	for _, arg := range args {
-		io.WriteString(b, arg.String()+" ")
+		hash, err := arg.Hash()
+		if err != nil {
+			return "", err
+		}
+		io.WriteString(b, hash+" ")
 	}
-	return b.String()
+	return b.String(), nil
 }
 
 func (f *FuncRuntime) bind(args []Expr) (impl *FuncImpl, result Expr, err error) {
@@ -111,12 +119,12 @@ func (f *FuncRuntime) bind(args []Expr) (impl *FuncImpl, result Expr, err error)
 	for idx, im := range f.fi.bodies {
 		if matchArgs(im.argfmt, args) {
 			impl = f.fi.bodies[idx]
-			// argfmt = impl.argfmt
-			// body = impl.body
 			argfmtFound = true
 			if im.memo {
-				keyArgs := keyOfArgs(args)
-				if res, ok := im.results[keyArgs]; ok {
+				keyArgs, err := keyOfArgs(args)
+				if err != nil {
+					log.Printf("Cannot compute hash of args: %v, %v", args, err)
+				} else if res, ok := im.results[keyArgs]; ok {
 					// log.Printf("%v: bind returns result: %v -> %v", f.fi.name, args, res)
 					return nil, res, nil
 				}
@@ -545,7 +553,18 @@ func matchArgs(argfmt Expr, args []Expr) (result bool) {
 					}
 				} else {
 					v, ok := args[i].(*Sexpr)
-					if !ok || at.String() != v.String() {
+					if !ok {
+						return false
+					}
+					h1, err := at.Hash()
+					if err != nil {
+						return false
+					}
+					h2, err := v.Hash()
+					if err != nil {
+						return false
+					}
+					if h1 != h2 {
 						return false
 					}
 				}
