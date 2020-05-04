@@ -99,7 +99,7 @@ func NewFuncRuntime(fi *FuncInterpret) *FuncRuntime {
 func keyOfArgs(args []Expr) string {
 	b := &strings.Builder{}
 	for _, arg := range args {
-		io.WriteString(b, arg.Repr()+" ")
+		io.WriteString(b, arg.String()+" ")
 	}
 	return b.String()
 }
@@ -361,11 +361,11 @@ func (f *FuncRuntime) evalExpr(expr Expr) (Expr, error) {
 // (var-name) (value)
 func (f *FuncRuntime) setVar(se *Sexpr) error {
 	if se.Len() != 2 {
-		return fmt.Errorf("set wants 2 argument, found %v", se.Repr())
+		return fmt.Errorf("set wants 2 argument, found %v", se)
 	}
 	name, ok := se.List[0].(Ident)
 	if !ok {
-		return fmt.Errorf("set expected identifier first, found %v", se.List[0].Repr())
+		return fmt.Errorf("set expected identifier first, found %v", se.List[0])
 	}
 	value, err := f.evalExpr(se.List[1])
 	if err != nil {
@@ -378,7 +378,7 @@ func (f *FuncRuntime) setVar(se *Sexpr) error {
 // (iter) (init-state)
 func (f *FuncRuntime) evalGen(se *Sexpr) (Expr, error) {
 	if se.Len() != 2 {
-		return nil, fmt.Errorf("gen wants 2 argument, found %v", se.Repr())
+		return nil, fmt.Errorf("gen wants 2 argument, found %v", se)
 	}
 	fn, err := f.evalExpr(se.List[0])
 	if err != nil {
@@ -404,7 +404,7 @@ func (f *FuncRuntime) findFunc(fname string) (Evaler, error) {
 	if v, ok := f.vars[fname]; ok {
 		vident, ok := v.(Ident)
 		if !ok {
-			return nil, fmt.Errorf("Cannot use argument %v as function", v.Repr())
+			return nil, fmt.Errorf("Cannot use argument %v as function", v)
 		}
 		fname = string(vident)
 	}
@@ -545,14 +545,14 @@ func matchArgs(argfmt Expr, args []Expr) (result bool) {
 					}
 				} else {
 					v, ok := args[i].(*Sexpr)
-					if !ok || at.Repr() != v.Repr() {
+					if !ok || at.String() != v.String() {
 						return false
 					}
 				}
 			case Ident:
 				// check if param is already binded
 				if val, ok := binds[string(at)]; ok {
-					if val.Repr() != args[i].Repr() {
+					if val.String() != args[i].String() {
 						return false
 					}
 				}

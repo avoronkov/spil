@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"math/big"
 	"strconv"
 )
@@ -30,11 +31,11 @@ func ParseInt64(token string) (Int, bool) {
 }
 
 func (i Int64) String() string {
-	return fmt.Sprintf("%d", int64(i))
+	return fmt.Sprintf("{Int64: %d}", int64(i))
 }
 
-func (i Int64) Repr() string {
-	return fmt.Sprintf("{Int64: %d}", int64(i))
+func (i Int64) Print(w io.Writer) {
+	fmt.Fprintf(w, "%d", int64(i))
 }
 
 func (i Int64) Plus(a Int) Int {
@@ -82,10 +83,11 @@ func ParseBigInt(token string) (Int, bool) {
 
 func (i *BigInt) String() string {
 	return i.value.String()
+	return fmt.Sprintf("{BigInt: %v}", i.value)
 }
 
-func (i *BigInt) Repr() string {
-	return fmt.Sprintf("{BigInt: %v}", i.value)
+func (i *BigInt) Print(w io.Writer) {
+	fmt.Fprintf(w, "%v", i.value)
 }
 
 func (i *BigInt) Plus(a Int) Int {

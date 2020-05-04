@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 )
 
 var _ List = (*LazyList)(nil)
@@ -23,28 +24,31 @@ func NewLazyList(iter Evaler, state Expr) *LazyList {
 
 // String() should evaluate the whole list
 func (l *LazyList) String() string {
+	return "Lazy{...}"
+}
+
+func (l *LazyList) Print(w io.Writer) {
 	var ll List = l
-	res := make([]Expr, 0, 64)
+	io.WriteString(w, "'(")
+	first := true
 	for !ll.Empty() {
+		if !first {
+			io.WriteString(w, " ")
+		} else {
+			first = false
+		}
+
 		val, err := ll.Head()
 		if err != nil {
 			panic(fmt.Errorf("Head() failed: %v", err))
 		}
-		res = append(res, val)
+		val.Print(w)
 		ll, err = ll.Tail()
 		if err != nil {
 			panic(fmt.Errorf("Tail() failed: %v", err))
 		}
 	}
-	se := &Sexpr{
-		List:   res,
-		Quoted: true,
-	}
-	return se.String()
-}
-
-func (l *LazyList) Repr() string {
-	return "TODO"
+	io.WriteString(w, ")")
 }
 
 func (l *LazyList) Head() (Expr, error) {
@@ -86,7 +90,7 @@ func (l *LazyList) next() (value Expr, state Expr, err error) {
 		return res.List[0], res.List[0], nil
 	}
 	if len(res.List) != 2 {
-		return nil, nil, fmt.Errorf("Iterator result is too long: %v", res.Repr())
+		return nil, nil, fmt.Errorf("Iterator result is too long: %v", res)
 	}
 	return res.List[0], res.List[1], nil
 }

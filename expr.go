@@ -2,49 +2,58 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"strings"
 )
 
 type Expr interface {
 	fmt.Stringer
-	Repr() string
+	// Repr() string
+	// Write yourself into writer
+	Print(io.Writer)
 }
 
 type Str string
 
+var _ Expr = Str("")
+
 func (s Str) String() string {
+	return fmt.Sprintf("{Str: %q}", string(s))
+}
+
+func (s Str) Print(w io.Writer) {
 	str := string(s)
 	str = strings.ReplaceAll(str, `\"`, `"`)
 	str = strings.ReplaceAll(str, `\\`, `\`)
 	str = strings.ReplaceAll(str, `\n`, "\n")
-	return str
-}
-
-func (s Str) Repr() string {
-	return fmt.Sprintf("{Str: %q}", string(s))
+	io.WriteString(w, str)
 }
 
 type Ident string
 
+var _ Expr = Ident("")
+
 func (i Ident) String() string {
-	return "_" + string(i)
+	return fmt.Sprintf("{Ident: %v}", string(i))
 }
 
-func (i Ident) Repr() string {
-	return fmt.Sprintf("{Ident: %v}", string(i))
+func (i Ident) Print(w io.Writer) {
+	io.WriteString(w, "_"+string(i))
 }
 
 type Bool bool
 
-func (i Bool) String() string {
+var _ Expr = Bool(false)
+
+func (i Bool) Print(w io.Writer) {
 	if bool(i) {
-		return "true"
+		io.WriteString(w, "true")
 	} else {
-		return "false"
+		io.WriteString(w, "false")
 	}
 }
 
-func (i Bool) Repr() string {
+func (i Bool) String() string {
 	if bool(i) {
 		return "{Bool: 'T}"
 	} else {
@@ -76,24 +85,22 @@ func QList(args ...Expr) *Sexpr {
 
 var QEmpty = &Sexpr{Quoted: true}
 
-func (s *Sexpr) String() string {
-	b := &strings.Builder{}
+func (s *Sexpr) Print(w io.Writer) {
 	if s.Quoted {
-		fmt.Fprintf(b, "'(")
+		fmt.Fprintf(w, "'(")
 	} else {
-		fmt.Fprintf(b, "(")
+		fmt.Fprintf(w, "(")
 	}
 	for i, item := range s.List {
 		if i != 0 {
-			fmt.Fprintf(b, " ")
+			fmt.Fprintf(w, " ")
 		}
-		fmt.Fprintf(b, "%v", item)
+		item.Print(w)
 	}
-	fmt.Fprintf(b, ")")
-	return b.String()
+	fmt.Fprintf(w, ")")
 }
 
-func (s *Sexpr) Repr() string {
+func (s *Sexpr) String() string {
 	b := &strings.Builder{}
 	if s.Quoted {
 		fmt.Fprintf(b, "{S':")
@@ -101,7 +108,7 @@ func (s *Sexpr) Repr() string {
 		fmt.Fprintf(b, "{S:")
 	}
 	for _, item := range s.List {
-		fmt.Fprintf(b, " %v", item.Repr())
+		fmt.Fprintf(b, " %v", item)
 	}
 	fmt.Fprintf(b, "}")
 	return b.String()

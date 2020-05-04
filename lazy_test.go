@@ -2,6 +2,7 @@ package main
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -91,9 +92,11 @@ func fibGen(args []Expr) (Expr, error) {
 
 func TestLazyListFiniteString(t *testing.T) {
 	ll := NewLazyList(EvalerFunc(testCounter), Int64(0))
-	act := ll.String()
+	var buffer strings.Builder
+	ll.Print(&buffer)
+	act := buffer.String()
 	exp := "'(1 2 3 4 5 6 7 8 9 10)"
 	if act != exp {
-		t.Errorf("Incorrect String() result of LazyList: expected %q, actual %q", exp, act)
+		t.Errorf("Incorrect string representation of LazyList: expected %q, actual %q", exp, act)
 	}
 }

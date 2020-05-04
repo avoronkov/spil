@@ -156,11 +156,11 @@ func (i *Interpret) Run(input io.Reader) error {
 // (func-name) args body...
 func (i *Interpret) defineFunc(se *Sexpr, memo bool) error {
 	if se.Len() < 3 {
-		return fmt.Errorf("Not enough arguments for function definition: %v", se.Repr())
+		return fmt.Errorf("Not enough arguments for function definition: %v", se)
 	}
 	name, ok := se.List[0].(Ident)
 	if !ok {
-		return fmt.Errorf("func expected identifier first, found %v", se.List[0].Repr())
+		return fmt.Errorf("func expected identifier first, found %v", se.List[0])
 	}
 
 	fname := string(name)
@@ -198,7 +198,7 @@ func (i *Interpret) use(args []Expr) error {
 		i.UseBigInt(true)
 		return nil
 	}
-	return fmt.Errorf("Unexpected argument type to 'use': %v (%T)", module.Repr(), module)
+	return fmt.Errorf("Unexpected argument type to 'use': %v (%T)", module, module)
 }
 
 func (in *Interpret) FPrint(args []Expr) (Expr, error) {
@@ -206,7 +206,7 @@ func (in *Interpret) FPrint(args []Expr) (Expr, error) {
 		if i > 0 {
 			fmt.Fprintf(in.output, " ")
 		}
-		fmt.Fprintf(in.output, "%v", e.String())
+		e.Print(in.output)
 	}
 	fmt.Fprintf(in.output, "\n")
 	return QEmpty, nil
