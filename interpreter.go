@@ -46,6 +46,7 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 		"space":  EvalerFunc(FSpace),
 		"eol":    EvalerFunc(FEol),
 		"empty":  EvalerFunc(FEmpty),
+		"int":    EvalerFunc(i.FInt),
 	}
 	return i
 }
@@ -148,10 +149,11 @@ func (i *Interpret) Run(input io.Reader) error {
 
 	// Interpreter LOOP
 	mainInterpret := NewFuncInterpret(i, "__main__")
-	if err := mainInterpret.AddImpl(QEmpty, i.mainBody, false); err != nil {
+	if err := mainInterpret.AddImpl(QList(Ident("__stdin")), i.mainBody, false); err != nil {
 		return err
 	}
-	_, err := mainInterpret.Eval(nil)
+	stdin := NewLazyInput()
+	_, err := mainInterpret.Eval([]Expr{stdin})
 	return err
 }
 
@@ -212,4 +214,20 @@ func (in *Interpret) FPrint(args []Expr) (Expr, error) {
 	}
 	fmt.Fprintf(in.output, "\n")
 	return QEmpty, nil
+}
+
+// convert string into int
+func (in *Interpret) FInt(args []Expr) (Expr, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("FInt: expected exaclty one argument, found %v", args)
+	}
+	s, ok := args[0].(Str)
+	if !ok {
+		return nil, fmt.Errorf("FInt: expected argument to be Str, found %v", args)
+	}
+	i, ok := in.parseInt(string(s))
+	if !ok {
+		return nil, fmt.Errorf("FInt: cannot convert argument into Int: %v", s)
+	}
+	return i, nil
 }
