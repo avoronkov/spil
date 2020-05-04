@@ -104,8 +104,8 @@ func (p *Parser) nextSexpr(quoted bool) (*Sexpr, error) {
 			list = append(list, n)
 			continue
 		}
-		if strings.HasPrefix(token, `"`) && strings.HasPrefix(token, `"`) {
-			list = append(list, Str(token[1:len(token)-1]))
+		if s, err := ParseString(token); err == nil {
+			list = append(list, s)
 			continue
 		}
 		list = append(list, Ident(token))

@@ -86,3 +86,9 @@
 				(self (list (head t) (tail t))))
 			  (list (head h) (list (tail h) t)))))
 	 (gen iter (list (head lists) (tail lists))))
+
+
+;; length
+(def length (lst) (length lst 0))
+(def length ('() acc) acc)
+(def length (lst acc) (length (tail lst) (+ acc 1)))
