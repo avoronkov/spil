@@ -43,6 +43,8 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 		"tail":   EvalerFunc(FTail),
 		"append": EvalerFunc(FAppend),
 		"list":   EvalerFunc(FList),
+		"space":  EvalerFunc(FSpace),
+		"eol":    EvalerFunc(FEol),
 		"empty":  EvalerFunc(FEmpty),
 	}
 	return i

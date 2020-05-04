@@ -415,7 +415,7 @@ func (f *FuncRuntime) findFunc(fname string) (Evaler, error) {
 	if v, ok := f.vars[fname]; ok {
 		vident, ok := v.(Ident)
 		if !ok {
-			return nil, fmt.Errorf("Cannot use argument %v as function", v)
+			return nil, fmt.Errorf("%v: cannot use argument %v as function", f.fi.name, v)
 		}
 		fname = string(vident)
 	}

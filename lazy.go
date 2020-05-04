@@ -77,7 +77,7 @@ func (l *LazyList) Head() (Expr, error) {
 		l.state = state
 	}
 	if l.value == nil {
-		return nil, fmt.Errorf("List is empty")
+		return nil, fmt.Errorf("LazyList.Head(): list is empty")
 	}
 	return l.value, nil
 }
@@ -117,7 +117,7 @@ func (l *LazyList) Tail() (List, error) {
 		l.state = state
 	}
 	if l.value == nil {
-		return nil, fmt.Errorf("List is empty")
+		return nil, fmt.Errorf("LazyList.Tail(): list is empty")
 	}
 	return &LazyList{
 		iter:       l.iter,

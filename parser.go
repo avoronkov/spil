@@ -62,8 +62,8 @@ func (p *Parser) NextExpr() (Expr, error) {
 	if n, ok := p.intParser.ParseInt(token); ok {
 		return n, nil
 	}
-	if strings.HasPrefix(token, `"`) && strings.HasPrefix(token, `"`) {
-		return Str(token[1 : len(token)-1]), nil
+	if s, err := ParseString(token); err == nil {
+		return s, nil
 	}
 	return Ident(token), nil
 }

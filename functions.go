@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"unicode"
 )
 
 type Evaler interface {
@@ -261,21 +262,19 @@ func FEmpty(args []Expr) (Expr, error) {
 	return Bool(a.Empty()), nil
 }
 
+type Appender interface {
+	Append([]Expr) (Expr, error)
+}
+
 func FAppend(args []Expr) (Expr, error) {
 	if len(args) < 2 {
 		return nil, fmt.Errorf("FAppend: expected at least 2 arguments, found %v", args)
 	}
-	l, ok := args[0].(*Sexpr)
+	a, ok := args[0].(Appender)
 	if !ok {
-		return nil, fmt.Errorf("FAppend: expected first argument to be List, found %v", args[0])
+		return nil, fmt.Errorf("FAppend: expected first argument to be Appender, found %v", args[0])
 	}
-	newList := make([]Expr, len(l.List))
-	copy(newList, l.List)
-	newList = append(newList, args[1:]...)
-	return &Sexpr{
-		List:   newList,
-		Quoted: l.Quoted,
-	}, nil
+	return a.Append(args[1:])
 }
 
 func FList(args []Expr) (Expr, error) {
@@ -283,4 +282,34 @@ func FList(args []Expr) (Expr, error) {
 		List:   args,
 		Quoted: true,
 	}, nil
+}
+
+// test if symbol is white-space
+func FSpace(args []Expr) (Expr, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("FSpace: expected exaclty one argument, found %v", args)
+	}
+	s, ok := args[0].(Str)
+	if !ok {
+		return nil, fmt.Errorf("FSpace: expected argument to be Str, found %v", args)
+	}
+	if len(s) != 1 {
+		return nil, fmt.Errorf("FSpace: expected argument to be Str of length 1, found %v", s)
+	}
+	return Bool(unicode.IsSpace(rune(string(s)[0]))), nil
+}
+
+// test if symbol is eol (\n)
+func FEol(args []Expr) (Expr, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("FEol: expected exaclty one argument, found %v", args)
+	}
+	s, ok := args[0].(Str)
+	if !ok {
+		return nil, fmt.Errorf("FEol: expected argument to be Str, found %v", args)
+	}
+	if len(s) != 1 {
+		return nil, fmt.Errorf("FEol: expected argument to be Str of length 1, found %v", s)
+	}
+	return Bool(s == "\n"), nil
 }

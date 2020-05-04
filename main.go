@@ -43,7 +43,7 @@ func doMain() int {
 	if len(flag.Args()) >= 1 {
 		f, err := os.Open(flag.Arg(0))
 		if err != nil {
-			fmt.Fprint(os.Stderr, err)
+			fmt.Fprintf(os.Stderr, "%v\n", err)
 			return 1
 		}
 		defer f.Close()
@@ -53,7 +53,7 @@ func doMain() int {
 	}
 
 	if err := in.Run(input); err != nil {
-		fmt.Fprint(os.Stderr, err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return 1
 	}
 	return 0

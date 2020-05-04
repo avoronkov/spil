@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -13,9 +14,47 @@ type Expr interface {
 	Hash() (string, error)
 }
 
+type List interface {
+	Expr
+	Head() (Expr, error)
+	Tail() (List, error)
+	Empty() bool
+}
+
 type Str string
 
-var _ Expr = Str("")
+var _ List = Str("")
+
+var NotStr = errors.New("Token is not a string")
+
+func ParseString(token string) (Str, error) {
+	if !strings.HasPrefix(token, `"`) || !strings.HasSuffix(token, `"`) {
+		return "", NotStr
+	}
+	str := token[1 : len(token)-1]
+	str = strings.ReplaceAll(str, `\"`, `"`)
+	str = strings.ReplaceAll(str, `\\`, `\`)
+	str = strings.ReplaceAll(str, `\n`, "\n")
+	return Str(str), nil
+}
+
+func (s Str) Head() (Expr, error) {
+	if s == "" {
+		return nil, fmt.Errorf("Cannot perform Head() on empty string")
+	}
+	return Str(string(s[0])), nil
+}
+
+func (s Str) Tail() (List, error) {
+	if s == "" {
+		return nil, fmt.Errorf("Cannot perform Tail() on empty string")
+	}
+	return Str(s[1:]), nil
+}
+
+func (s Str) Empty() bool {
+	return s == ""
+}
 
 func (s Str) String() string {
 	return fmt.Sprintf("{Str: %q}", string(s))
@@ -26,11 +65,19 @@ func (s Str) Hash() (string, error) {
 }
 
 func (s Str) Print(w io.Writer) {
-	str := string(s)
-	str = strings.ReplaceAll(str, `\"`, `"`)
-	str = strings.ReplaceAll(str, `\\`, `\`)
-	str = strings.ReplaceAll(str, `\n`, "\n")
-	io.WriteString(w, str)
+	io.WriteString(w, string(s))
+}
+
+func (s Str) Append(args []Expr) (Expr, error) {
+	result := string(s)
+	for i, arg := range args {
+		str, ok := arg.(Str)
+		if !ok {
+			return nil, fmt.Errorf("Str.Append() expect argument at position %v to be Str, found: %v", i, arg)
+		}
+		result += string(str)
+	}
+	return Str(result), nil
 }
 
 type Ident string
@@ -71,13 +118,6 @@ func (i Bool) Print(w io.Writer) {
 	} else {
 		io.WriteString(w, "false")
 	}
-}
-
-type List interface {
-	Expr
-	Head() (Expr, error)
-	Tail() (List, error)
-	Empty() bool
 }
 
 var _ List = (*Sexpr)(nil)
@@ -168,4 +208,11 @@ func (s *Sexpr) Tail() (List, error) {
 
 func (s *Sexpr) Empty() bool {
 	return len(s.List) == 0
+}
+
+func (s *Sexpr) Append(args []Expr) (Expr, error) {
+	return &Sexpr{
+		List:   append(s.List, args...),
+		Quoted: s.Quoted,
+	}, nil
 }
