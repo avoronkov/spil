@@ -23,6 +23,7 @@ func TestNextToken(t *testing.T) {
 		{`"foo \" bar"`, []string{`"foo \" bar"`}},
 		{`(print "hello \"world\"" )`, []string{"(", "print", `"hello \"world\""`, ")"}},
 		{"(hello)\ntrue\n#vim ft=lisp", []string{"(", "hello", ")", "true"}},
+		{`\(foo bar)`, []string{`\(`, "foo", "bar", ")"}},
 	}
 
 	for _, test := range testdata {
@@ -49,7 +50,7 @@ func TestNextToken(t *testing.T) {
 					tokens = append(tokens, tok)
 				}
 				if !reflect.DeepEqual(tokens, test.result) {
-					t.Errorf("Tokens are parsed incorrectly:\nexpected %s,\n  actual %s", test.result[0], tokens[0])
+					t.Errorf("Tokens are parsed incorrectly:\nexpected %v,\n  actual %v", test.result, tokens)
 				}
 			})
 		}

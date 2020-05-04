@@ -81,13 +81,16 @@ func (p *Parser) nextSexpr() (*Sexpr, error) {
 		if token == ")" {
 			break
 		}
-		if token == "(" || token == "'(" {
+		if token == "(" || token == "'(" || token == "\\(" {
 			item, err := p.nextSexpr()
 			if err != nil {
 				return nil, err
 			}
 			if token == "'(" {
 				item.Quoted = true
+			}
+			if token == "\\(" {
+				item.Lambda = true
 			}
 			list = append(list, item)
 			continue
@@ -154,6 +157,8 @@ func (p *Parser) prepareTokens() error {
 		} else if r == '(' {
 			if token == "'" {
 				tokens = append(tokens, "'(")
+			} else if token == "\\" {
+				tokens = append(tokens, `\(`)
 			} else if token != "" {
 				tokens = append(tokens, token, "(")
 			} else {

@@ -260,6 +260,13 @@ func (f *FuncRuntime) lastExpr(e Expr) (Expr, error) {
 		}
 		head, _ := a.Head()
 		if name, ok := head.(Ident); ok {
+			if a.Lambda {
+				return f.evalLambda(&Sexpr{List: []Expr{a}, Quoted: true})
+			}
+			if name == "lambda" {
+				tail, _ := a.Tail()
+				return f.evalLambda(tail.(*Sexpr))
+			}
 			if name == "if" {
 				// (cond) (expr-if-true) (expr-if-false)
 				if len(a.List) != 4 {
@@ -334,10 +341,6 @@ func (f *FuncRuntime) lastExpr(e Expr) (Expr, error) {
 			if name == "gen" {
 				tail, _ := a.Tail()
 				return f.evalGen(tail.(*Sexpr))
-			}
-			if name == "lambda" {
-				tail, _ := a.Tail()
-				return f.evalLambda(tail.(*Sexpr))
 			}
 			if name == "apply" {
 				tail, _ := a.Tail()
@@ -431,7 +434,7 @@ func (f *FuncRuntime) evalFunc(se *Sexpr) (Expr, error) {
 	}
 	name, ok := head.(Ident)
 	if !ok {
-		return nil, fmt.Errorf("Wanted identifier, found: %v", head)
+		return nil, fmt.Errorf("Wanted identifier, found: %v (%v)", head, se)
 	}
 	fname := string(name)
 	fu, err := f.findFunc(fname)

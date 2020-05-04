@@ -8,7 +8,6 @@ import (
 
 type Expr interface {
 	fmt.Stringer
-	// Repr() string
 	// Write yourself into writer
 	Print(io.Writer)
 	Hash() (string, error)
@@ -86,6 +85,7 @@ var _ List = (*Sexpr)(nil)
 type Sexpr struct {
 	List   []Expr
 	Quoted bool
+	Lambda bool
 }
 
 func QList(args ...Expr) *Sexpr {
