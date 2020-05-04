@@ -1,8 +1,226 @@
 # SPIL - SimPle LIsp implementation written in Go
 
+## Installation
+
+```
+$ go get gitlab.com/avoronkov/spil
+$ spil
+(print "hello world!")
+^D
+hello world!
+```
+
+## Language overview
+
+Well, it's a kind of Lisp, so you write you code with the contructions like that:
+```
+(print (- (* 2 3) 1))
+(print (+ 1 2 3 4 5))
+(print "this is true:" 'T "and this is false:" 'F)
+(print "this is a raw list:" '(1 2 3 print hello))
+```
+
+Also it's (almost) pure functional language, so you have no mutable variables and no loops.
+(Actually `print` is the only statement with side effects).
+
+### Comments
+
+Lines started with `;` or `#` are comments.
+
+### Data types
+
+SPIL (like most of other Lisps) has atoms and lists as basic data type.
+Atoms include the following:
+
+- Integers (0 1 25 1235 -128 ...)
+
+- Booleans ('T 'F)
+
+- Strings ("hello world!" "foo" "bar" ...)
+
+- Identifiers (foo bar func if ...)
+
+Lists include:
+
+- unquoted s-expressions (`(foo 1 2 3)` ... )
+
+- and quoted (raw) ones (`'(this is "not" evaluated)`)
+
+### Everything is an expression
+
+Every statement in SPIL is an expression i.e. every statement is r-value which can be returned from function or assigned to "variable".
+
+### Basic functions
+
+SPIL has the following builtin functions implemented in Go:
+
+- `print` - prints values of expressions on stdout.
+
+- Arithmetic operations: `+`, `-`, `*`, `/`, `mod`, `<`, `>`, `<=`, `>=`.
+
+- Equality operator: `=`
+
+- Functions to work with lists: `head`, `tail`, `append`, `list`, `empty`.
+
+### User-defined functions
+
+You may define you own function with keyword `def` (of `func`):
+```
+; (def <function-name> <function-parameters> <body-statement1> ...)
+(def plus-one (n) (+ n 1))
+
+(print (plus-one 3))
+; 4
+```
+
+Return value of function is a return value of last expression in function.
+
+Note that `def` defined so-called "pure" function i.e. its return value can depend only on its arguments.
+
+Function may have multiple definitions with different set of arguments:
+```
+(def factorial (0) 1)
+(def factorial (n) (* n (factorial (- n 1))))
+```
+
+### Control flows
+
+SPIL has conditional operator `if` which has the following syntax:
+```
+(if  some-condition  return-value-if-true return-value-if-false)
+```
+
+Note that `if` is also an expression i.e. it has a return value.
+
+### Recursion
+
+SPIL has no loops. Instead it uses recursion as in example above:
+```
+(def factorial (0) 1)
+(def factorial (n) (* n (factorial (- n 1))))
+```
+
+Note that such recursion is not very effective because it consumes call-stack.
+That's why it's better to use tail-call recursion like that:
+```
+(def factorial (n) 1)
+(def factorial (0 result) result)
+(def factorial (n result) (factorial (- n 1) (* result n)))
+```
+SPIL has Tail Call Optimization so the result will be returned from `(factorial 0 result)` directly to the caller.
+
+If you are not familiar with recursion and tail calls you may read a great book for functional programming beginners [Learn you some Erlang for great good](https://learnyousomeerlang.com/).
+
+### Passing functions as arguments to other functions
+
+You may pass function as an argument by its name:
+```
+(func plus-one (n) (+ n 1))
+
+(func apply-func-to-ten (fn) (fn 10))
+
+(print (apply-func-to-ten plus-one))
+; 11
+```
+
+### Lambdas
+
+You can define lambda-functions with `lamda` keyword.
+```
+(func apply-func-to-ten (fn) (fn 10))
+
+(print (apply-func-to-ten (lambda (+ _1 1))))
+; 11
+```
+Lambdas are very similar to regular functions but they have some difference:
+
+- Lambda can grab values of variable from the context where lambda is defined:
+```
+(func apply-func-to-ten (fn) (fn 10))
+
+(set n 5)
+
+(print (apply-func-to-ten (lambda (+ _1 n))))
+; 15
+```
+
+- Lambdas are designed to be small so they use short syntax of accessing arguments:
+`_1 _2 _3 ...` for accessing positional arguments and `__args` for accessing whole list of arguments.
+
+### Lazy lists
+
+You can use keyword `gen` to define finite or infinite lazy lists.
+For example lazy-list of positive integers can be defined like this:
+```
+(def inc (n) (+ n 1))
+
+; infinite lazy list of integers: (1 2 3 4 ...)
+(set ints (gen inc 0))
+```
+
+`gen` has the following syntax:
+```
+(gen <iterator-function> <initial-state>)
+```
+When somebody asks for `head` of lazy lists then `iterator-function` is called with value of previous state.
+Iterator should return one of the following:
+
+- Empty list `'()` to indicate that list has ended.
+
+- List with one element `(list value)` which will be returned as next element (head) in lazy-list and will be passed to the next call of iterator.
+
+- List of two elements `(list value new-state)`. `value` will be returned by `head`, `new-state` will be passed to the next call of iterator.
+
+For example the infinite list of Fibonacci numbers:
+```
+(def next-fib (prev)
+	(set a (head prev))
+	(set b (head (tail prev)))
+	(list b (list b (+ a b))))
+(set fibs (gen next-fib '(1 1)))
+
+(print (take 10 fibs))
+; '(1 2 3 5 8 13 21 34 55 89)
+```
+
+### Using modules
+
+You can `use` other modules in your program:
+```
+(use "some-module.lisp")
+
+(function-from-some-module ...)
+```
+
+### Big math
+You can use big integers instead of int64 in calculations by adding `(use bigmath)` statement and the beginning of the main module.
+
+### Memoization
+
+You can tell the interpreter to remember function results by defining function with `def'` (or `func'`) keyword.
+As a result if such function is called with the same set of arguments twice then its result will be calculated only once.
+Second time it will return the stored result.
+
+```
+(def' x2 (n) (print "evaluating x2" n) (* n 2))
+
+(print (x2 5))
+(print (x2 6))
+(print (x2 5))
+; evaluating x2 5
+; 10
+; evaluating x2 6
+; 12
+; 10
+```
+
+## Examples
+
+You can find some examples of code [here](https://gitlab.com/avoronkov/spil/-/tree/master/examples)
+
 ## TODO
 
-- do-statement support
+- [+] do-statement support
 
 - [+] multiple function definition with pattern matching
 
@@ -10,8 +228,8 @@
 
 - [+] lazy lists
 
-- apply
+- [+] apply
 
-- anonymous functions (?)
+- [+] anonymous functions (?)
 
 - function "list"
