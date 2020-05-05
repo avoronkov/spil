@@ -12,6 +12,7 @@ type LazyList struct {
 	state      Expr
 	value      Expr
 	valueReady bool
+	tail       *LazyList
 }
 
 func NewLazyList(iter Evaler, state Expr) *LazyList {
@@ -119,11 +120,14 @@ func (l *LazyList) Tail() (List, error) {
 	if l.value == nil {
 		return nil, fmt.Errorf("LazyList.Tail(): list is empty")
 	}
-	return &LazyList{
-		iter:       l.iter,
-		state:      l.state,
-		valueReady: false,
-	}, nil
+	if l.tail == nil {
+		l.tail = &LazyList{
+			iter:       l.iter,
+			state:      l.state,
+			valueReady: false,
+		}
+	}
+	return l.tail, nil
 }
 
 func (l *LazyList) Empty() bool {
