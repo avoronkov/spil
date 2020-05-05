@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 )
 
 type LazyInput struct {
+	file       io.ReadCloser
 	input      *bufio.Reader
 	valueReady bool
 	value      Expr
@@ -17,9 +17,10 @@ type LazyInput struct {
 
 var _ List = (*LazyInput)(nil)
 
-func NewLazyInput() *LazyInput {
+func NewLazyInput(f io.ReadCloser) *LazyInput {
 	return &LazyInput{
-		input: bufio.NewReader(os.Stdin),
+		file:  f,
+		input: bufio.NewReader(f),
 	}
 }
 
@@ -52,12 +53,14 @@ func (i *LazyInput) Tail() (List, error) {
 
 }
 
-func (i *LazyInput) Empty() bool {
-	log.Printf("Input.Empty()")
+func (i *LazyInput) Empty() (result bool) {
+	defer func() {
+		log.Printf("Input.Empty(): %v", result)
+	}()
 	if err := i.next(); err != nil {
 		panic(err)
 	}
-	return i.value != nil
+	return i.value == nil
 }
 
 func (i *LazyInput) next() error {
@@ -90,4 +93,12 @@ func (i *LazyInput) Print(w io.Writer) {
 
 func (i *LazyInput) Hash() (string, error) {
 	return "", fmt.Errorf("Hash() is not applicable for LazyInput")
+}
+
+func (i *LazyInput) Close() error {
+	log.Printf("Closing file")
+	if i.file != nil {
+		return i.file.Close()
+	}
+	return nil
 }

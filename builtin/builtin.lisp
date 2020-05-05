@@ -80,7 +80,7 @@
 		  (lambda 
 			(set h (first _1))
 			(set t (second _1))
-			(if (= h '())
+			(if (empty h)
 			  (if (empty t)
 				'()
 				(self (list (head t) (tail t))))

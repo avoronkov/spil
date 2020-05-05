@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"regexp"
 	"strings"
 )
@@ -85,7 +86,12 @@ func (f *FuncInterpret) Eval(args []Expr) (Expr, error) {
 	if result != nil {
 		return result, nil
 	}
-	return run.Eval(impl)
+	res, err := run.Eval(impl)
+	if err != nil {
+		return nil, err
+	}
+	run.cleanup()
+	return res, err
 }
 
 type FuncRuntime struct {
@@ -601,6 +607,11 @@ func (f *FuncRuntime) cleanup() {
 		switch a := expr.(type) {
 		case Ident:
 			f.fi.interpret.DeleteLambda(string(a))
+		case io.Closer:
+			fmt.Fprintf(os.Stderr, "Close the closer: %v", varname)
+			if err := a.Close(); err != nil {
+				log.Printf("Close() failed: %v", err)
+			}
 		default:
 			log.Printf("Don't know how to clean variable of type: %v", expr)
 		}

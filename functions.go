@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"unicode"
 )
 
@@ -267,8 +268,11 @@ type Appender interface {
 }
 
 func FAppend(args []Expr) (Expr, error) {
-	if len(args) < 2 {
-		return nil, fmt.Errorf("FAppend: expected at least 2 arguments, found %v", args)
+	if len(args) == 0 {
+		return QEmpty, nil
+	}
+	if len(args) == 1 {
+		return args[0], nil
 	}
 	a, ok := args[0].(Appender)
 	if !ok {
@@ -312,4 +316,19 @@ func FEol(args []Expr) (Expr, error) {
 		return nil, fmt.Errorf("FEol: expected argument to be Str of length 1, found %v", s)
 	}
 	return Bool(s == "\n"), nil
+}
+
+func FOpen(args []Expr) (Expr, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("FOpen: expected exaclty one argument, found %v", args)
+	}
+	s, ok := args[0].(Str)
+	if !ok {
+		return nil, fmt.Errorf("FOpen: expected argument to be Str, found %v", args)
+	}
+	file, err := os.Open(string(s))
+	if err != nil {
+		return nil, err
+	}
+	return NewLazyInput(file), nil
 }

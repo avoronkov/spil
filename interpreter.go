@@ -47,6 +47,7 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 		"eol":    EvalerFunc(FEol),
 		"empty":  EvalerFunc(FEmpty),
 		"int":    EvalerFunc(i.FInt),
+		"open":   EvalerFunc(FOpen),
 	}
 	return i
 }
@@ -152,7 +153,7 @@ func (i *Interpret) Run(input io.Reader) error {
 	if err := mainInterpret.AddImpl(QList(Ident("__stdin")), i.mainBody, false); err != nil {
 		return err
 	}
-	stdin := NewLazyInput()
+	stdin := NewLazyInput(os.Stdin)
 	_, err := mainInterpret.Eval([]Expr{stdin})
 	return err
 }
