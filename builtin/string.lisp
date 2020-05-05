@@ -1,7 +1,7 @@
 ;; split string into words
 (def next-string (sep str) (next-string sep str ""))
-(def next-string (sep "" "") '())
-(def next-string (sep "" acc) (list acc ""))
+(def next-string (sep '() "") '())
+(def next-string (sep '() acc) (list acc ""))
 (def next-string (sep str acc)
 	 (if (sep (head str))
 	   (if (= acc "")

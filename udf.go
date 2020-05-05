@@ -39,10 +39,9 @@ func NewFuncImpl(argfmt Expr, body []Expr, memo bool) *FuncImpl {
 }
 
 func (i *FuncImpl) RememberResult(name string, args []Expr, result Expr) {
-	// log.Printf("%v: rememberRusult %v -> %v", name, args, result)
 	keyArgs, err := keyOfArgs(args)
 	if err != nil {
-		log.Printf("Cannot rememer result for %v: %v", args, err)
+		fmt.Fprintf(os.Stderr, "%v: cannot rememer result for %v: %v\n", name, args, err)
 		return
 	}
 	if _, ok := i.results[keyArgs]; ok {
@@ -77,7 +76,6 @@ func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr, memo bool) error {
 }
 
 func (f *FuncInterpret) Eval(args []Expr) (Expr, error) {
-	// log.Printf("%v: Eval(%v)", f.name, args)
 	run := NewFuncRuntime(f)
 	impl, result, err := run.bind(args)
 	if err != nil {
@@ -121,7 +119,6 @@ func keyOfArgs(args []Expr) (string, error) {
 }
 
 func (f *FuncRuntime) bind(args []Expr) (impl *FuncImpl, result Expr, err error) {
-	// log.Printf("%v: bind args %v", f.fi.name, args)
 	f.cleanup()
 	argfmtFound := false
 	for idx, im := range f.fi.bodies {
@@ -133,7 +130,6 @@ func (f *FuncRuntime) bind(args []Expr) (impl *FuncImpl, result Expr, err error)
 				if err != nil {
 					log.Printf("Cannot compute hash of args: %v, %v", args, err)
 				} else if res, ok := im.results[keyArgs]; ok {
-					// log.Printf("%v: bind returns result: %v -> %v", f.fi.name, args, res)
 					return nil, res, nil
 				}
 			}
@@ -144,7 +140,6 @@ func (f *FuncRuntime) bind(args []Expr) (impl *FuncImpl, result Expr, err error)
 		err = fmt.Errorf("No matching function implementation for %v found", f.fi.name)
 		return
 	}
-	// log.Printf("%v: bind impl.argfmt = %v", f.fi.name, impl.argfmt)
 	if impl.argfmt != nil {
 		switch a := impl.argfmt.(type) {
 		case Ident:
@@ -174,7 +169,6 @@ func (f *FuncRuntime) Eval(impl *FuncImpl) (res Expr, err error) {
 L:
 	for {
 		last := len(impl.body) - 1
-		// // log.Printf("Function %q: eval %v over %+v", f.fi.name, body, f.vars)
 		for i, expr := range impl.body {
 			if i == last {
 				// check for tail call
@@ -186,7 +180,6 @@ L:
 				if !ok {
 					if impl.memo {
 						// lets remenber the result
-						// log.Printf("%v: remember result 1", f.fi.name)
 						impl.RememberResult(f.fi.name, f.args, e)
 					}
 					// nothing to evaluate
@@ -195,7 +188,6 @@ L:
 				if lst.Quoted || lst.Len() == 0 {
 					if impl.memo {
 						// lets remenber the result
-						// log.Printf("%v: remember result 2", f.fi.name)
 						impl.RememberResult(f.fi.name, f.args, lst)
 					}
 					return lst, nil
@@ -209,7 +201,6 @@ L:
 					}
 					if impl.memo {
 						// lets remenber the result
-						// log.Printf("%v: remember result 3", f.fi.name)
 						impl.RememberResult(f.fi.name, f.args, result)
 					}
 					return result, nil
@@ -358,9 +349,12 @@ func (f *FuncRuntime) lastExpr(e Expr) (Expr, error) {
 
 		// return unevaluated list
 		return a, nil
+	case *LazyList:
+		return a, nil
 	}
-	panic(fmt.Errorf("Unexpected Expr type: %v (%T)", e, e))
+	panic(fmt.Errorf("%v: Unexpected Expr type: %v (%T)", f.fi.name, e, e))
 }
+
 func (f *FuncRuntime) evalExpr(expr Expr) (Expr, error) {
 	e, err := f.lastExpr(expr)
 	if err != nil {
@@ -392,7 +386,6 @@ func (f *FuncRuntime) setVar(se *Sexpr, scoped bool) error {
 	}
 	f.vars[string(name)] = value
 	if scoped {
-		log.Printf("scoped: %v", string(name))
 		f.scopedVars = append(f.scopedVars, string(name))
 	}
 	return nil
@@ -602,13 +595,11 @@ func matchArgs(argfmt Expr, args []Expr) (result bool) {
 
 func (f *FuncRuntime) cleanup() {
 	for _, varname := range f.scopedVars {
-		log.Printf("cleanup: %v", varname)
 		expr := f.vars[varname]
 		switch a := expr.(type) {
 		case Ident:
 			f.fi.interpret.DeleteLambda(string(a))
 		case io.Closer:
-			fmt.Fprintf(os.Stderr, "Close the closer: %v", varname)
 			if err := a.Close(); err != nil {
 				log.Printf("Close() failed: %v", err)
 			}
