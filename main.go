@@ -13,6 +13,7 @@ import (
 var (
 	trace  bool
 	bigint bool
+	stat   bool
 )
 
 func init() {
@@ -21,6 +22,9 @@ func init() {
 
 	flag.BoolVar(&bigint, "big", false, "use big math")
 	flag.BoolVar(&bigint, "b", false, "use big math (shorthand)")
+
+	flag.BoolVar(&stat, "stat", false, "dump statistics after program exit")
+	flag.BoolVar(&stat, "s", false, "dump statistics after program exit (shorthand)")
 }
 
 func doMain() int {
@@ -55,6 +59,9 @@ func doMain() int {
 	if err := in.Run(input); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return 1
+	}
+	if stat {
+		in.Stat()
 	}
 	return 0
 }

@@ -5,25 +5,25 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Interpret struct {
-	// parser *Parser
 	output   io.Writer
-	vars     map[string]Expr
 	funcs    map[string]Evaler
 	mainBody []Expr
 
 	builtinDir string
 
 	parseInt func(token string) (Int, bool)
+
+	lambdaCount int
 }
 
 func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 	i := &Interpret{
 		output:     w,
 		builtinDir: builtinDir,
-		vars:       make(map[string]Expr),
 		parseInt:   ParseInt64,
 	}
 	i.funcs = map[string]Evaler{
@@ -230,4 +230,26 @@ func (in *Interpret) FInt(args []Expr) (Expr, error) {
 		return nil, fmt.Errorf("FInt: cannot convert argument into Int: %v", s)
 	}
 	return i, nil
+}
+
+func (in *Interpret) NewLambdaName() (name string) {
+	name = fmt.Sprintf("__lambda__%03d", in.lambdaCount)
+	in.lambdaCount++
+	return
+}
+
+func (in *Interpret) DeleteLambda(name string) {
+	if !strings.HasPrefix(name, "__lambda__") {
+		return
+	}
+	if _, ok := in.funcs[name]; ok {
+		delete(in.funcs, name)
+	}
+}
+
+func (in *Interpret) Stat() {
+	fmt.Fprintf(os.Stderr, "Functions:\n")
+	for fname, _ := range in.funcs {
+		fmt.Fprintf(os.Stderr, "%v\n", fname)
+	}
 }

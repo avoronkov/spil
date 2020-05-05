@@ -92,6 +92,8 @@ type FuncRuntime struct {
 	fi   *FuncInterpret
 	vars map[string]Expr
 	args []Expr
+	// variables that should be Closed after leaving this variable scope.
+	scopedVars []string
 }
 
 func NewFuncRuntime(fi *FuncInterpret) *FuncRuntime {
@@ -114,7 +116,7 @@ func keyOfArgs(args []Expr) (string, error) {
 
 func (f *FuncRuntime) bind(args []Expr) (impl *FuncImpl, result Expr, err error) {
 	// log.Printf("%v: bind args %v", f.fi.name, args)
-	f.vars = make(map[string]Expr)
+	f.cleanup()
 	argfmtFound := false
 	for idx, im := range f.fi.bodies {
 		if matchArgs(im.argfmt, args) {
@@ -331,9 +333,9 @@ func (f *FuncRuntime) lastExpr(e Expr) (Expr, error) {
 				}
 				return Bool(false), nil
 			}
-			if name == "set" {
+			if name == "set" || name == "set'" {
 				tail, _ := a.Tail()
-				if err := f.setVar(tail.(*Sexpr)); err != nil {
+				if err := f.setVar(tail.(*Sexpr) /*scoped*/, name == "set'"); err != nil {
 					return nil, err
 				}
 				return QEmpty, nil
@@ -370,7 +372,7 @@ func (f *FuncRuntime) evalExpr(expr Expr) (Expr, error) {
 }
 
 // (var-name) (value)
-func (f *FuncRuntime) setVar(se *Sexpr) error {
+func (f *FuncRuntime) setVar(se *Sexpr, scoped bool) error {
 	if se.Len() != 2 {
 		return fmt.Errorf("set wants 2 argument, found %v", se)
 	}
@@ -383,6 +385,10 @@ func (f *FuncRuntime) setVar(se *Sexpr) error {
 		return err
 	}
 	f.vars[string(name)] = value
+	if scoped {
+		log.Printf("scoped: %v", string(name))
+		f.scopedVars = append(f.scopedVars, string(name))
+	}
 	return nil
 }
 
@@ -457,11 +463,8 @@ func (f *FuncRuntime) evalFunc(se *Sexpr) (Expr, error) {
 	return result, err
 }
 
-var lambdaCount = 0
-
 func (f *FuncRuntime) evalLambda(se *Sexpr) (Expr, error) {
-	name := fmt.Sprintf("__lambda__%03d", lambdaCount)
-	lambdaCount++
+	name := f.fi.interpret.NewLambdaName()
 	fi := NewFuncInterpret(f.fi.interpret, name)
 	body := f.replaceVars(se.List)
 	fi.AddImpl(nil, body, false)
@@ -589,4 +592,19 @@ func matchArgs(argfmt Expr, args []Expr) (result bool) {
 		return true
 	}
 	panic(fmt.Errorf("Unexpected argument format type: %v (%T)", argfmt, argfmt))
+}
+
+func (f *FuncRuntime) cleanup() {
+	for _, varname := range f.scopedVars {
+		log.Printf("cleanup: %v", varname)
+		expr := f.vars[varname]
+		switch a := expr.(type) {
+		case Ident:
+			f.fi.interpret.DeleteLambda(string(a))
+		default:
+			log.Printf("Don't know how to clean variable of type: %v", expr)
+		}
+	}
+	f.scopedVars = f.scopedVars[:0]
+	f.vars = make(map[string]Expr)
 }
