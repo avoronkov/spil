@@ -12,7 +12,7 @@ type LazyInput struct {
 	input      *bufio.Reader
 	valueReady bool
 	value      Expr
-	tailCalled bool
+	tail       *LazyInput
 }
 
 var _ List = (*LazyInput)(nil)
@@ -43,14 +43,12 @@ func (i *LazyInput) Tail() (List, error) {
 	if i.value == nil {
 		return nil, fmt.Errorf("Input: cannot perform Tail() on empty stream")
 	}
-	if i.tailCalled {
-		return nil, fmt.Errorf("Input: cannot perform Tail() twice")
+	if i.tail == nil {
+		i.tail = &LazyInput{
+			input: i.input,
+		}
 	}
-	i.tailCalled = true
-	return &LazyInput{
-		input: i.input,
-	}, nil
-
+	return i.tail, nil
 }
 
 func (i *LazyInput) Empty() (result bool) {
@@ -87,8 +85,13 @@ func (i *LazyInput) String() string {
 }
 
 func (i *LazyInput) Print(w io.Writer) {
-	i.tailCalled = true
-	io.Copy(w, i.input)
+	if i.Empty() {
+		return
+	}
+	h, _ := i.Head()
+	io.WriteString(w, string(h.(Str)))
+	t, _ := i.Tail()
+	t.Print(w)
 }
 
 func (i *LazyInput) Hash() (string, error) {
