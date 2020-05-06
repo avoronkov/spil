@@ -337,9 +337,9 @@ func (f *FuncRuntime) lastExpr(e Expr) (Expr, error) {
 				}
 				return QEmpty, nil
 			}
-			if name == "gen" {
+			if name == "gen" || name == "gen'" {
 				tail, _ := a.Tail()
-				return f.evalGen(tail.(*Sexpr))
+				return f.evalGen(tail.(*Sexpr) /*hashable*/, name == "gen'")
 			}
 			if name == "apply" {
 				tail, _ := a.Tail()
@@ -392,7 +392,7 @@ func (f *FuncRuntime) setVar(se *Sexpr, scoped bool) error {
 }
 
 // (iter) (init-state)
-func (f *FuncRuntime) evalGen(se *Sexpr) (Expr, error) {
+func (f *FuncRuntime) evalGen(se *Sexpr, hashable bool) (Expr, error) {
 	if se.Len() != 2 {
 		return nil, fmt.Errorf("gen wants 2 argument, found %v", se)
 	}
@@ -412,7 +412,7 @@ func (f *FuncRuntime) evalGen(se *Sexpr) (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewLazyList(fu, state), nil
+	return NewLazyList(fu, state, hashable), nil
 }
 
 func (f *FuncRuntime) findFunc(fname string) (Evaler, error) {

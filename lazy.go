@@ -13,14 +13,22 @@ type LazyList struct {
 	value      Expr
 	valueReady bool
 	tail       *LazyList
+	id         int64
 }
 
-func NewLazyList(iter Evaler, state Expr) *LazyList {
-	return &LazyList{
+var lazyHashCount int64
+
+func NewLazyList(iter Evaler, state Expr, hashable bool) *LazyList {
+	l := &LazyList{
 		iter:       iter,
 		state:      state,
 		valueReady: false,
 	}
+	if hashable {
+		lazyHashCount++
+		l.id = lazyHashCount
+	}
+	return l
 }
 
 // String() should evaluate the whole list
@@ -35,6 +43,9 @@ func (l *LazyList) String() string {
 func (l *LazyList) Hash() (string, error) {
 	if l.Empty() {
 		return l.String(), nil
+	}
+	if l.id > 0 {
+		return fmt.Sprintf("{Lazy[%d]}", l.id), nil
 	}
 	return "", fmt.Errorf("Hash is not applicable to non-empty lazy lists")
 }
@@ -121,11 +132,7 @@ func (l *LazyList) Tail() (List, error) {
 		return nil, fmt.Errorf("LazyList.Tail(): list is empty")
 	}
 	if l.tail == nil {
-		l.tail = &LazyList{
-			iter:       l.iter,
-			state:      l.state,
-			valueReady: false,
-		}
+		l.tail = NewLazyList(l.iter, l.state, l.id > 0)
 	}
 	return l.tail, nil
 }
