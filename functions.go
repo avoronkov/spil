@@ -8,12 +8,27 @@ import (
 
 type Evaler interface {
 	Eval([]Expr) (Expr, error)
+	ReturnType() Type
 }
 
-type EvalerFunc func([]Expr) (Expr, error)
+type nativeFunc struct {
+	fn  func([]Expr) (Expr, error)
+	ret Type
+}
 
-func (f EvalerFunc) Eval(args []Expr) (Expr, error) {
-	return f(args)
+func (n *nativeFunc) Eval(args []Expr) (Expr, error) {
+	return n.fn(args)
+}
+
+func (n *nativeFunc) ReturnType() Type {
+	return n.ret
+}
+
+func EvalerFunc(fn func([]Expr) (Expr, error), ret Type) Evaler {
+	return &nativeFunc{
+		fn:  fn,
+		ret: ret,
+	}
 }
 
 func FPlus(args []Expr) (Expr, error) {

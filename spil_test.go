@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -73,11 +74,21 @@ func checkInterpreter(t *testing.T, input, output string, builtin, bigint bool) 
 	in := NewInterpreter(buffer, builtinDir)
 	in.UseBigInt(bigint)
 
-	if err := in.Run(fin); err != nil {
+	if err := run(in, fin); err != nil {
 		t.Fatalf("Interpreter Run() failed: %v", err)
 	}
 
 	if act, exp := buffer.String(), string(expData); act != exp {
 		t.Errorf("Incorrect output for %v: expected %q, actual %q", input, exp, act)
 	}
+}
+
+func run(i *Interpret, input io.Reader) error {
+	if err := i.Parse(input); err != nil {
+		return err
+	}
+	if err := i.Check(); err != nil {
+		return err
+	}
+	return i.Run()
 }

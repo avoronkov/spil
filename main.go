@@ -14,6 +14,7 @@ var (
 	trace  bool
 	bigint bool
 	stat   bool
+	check  bool
 )
 
 func init() {
@@ -25,6 +26,9 @@ func init() {
 
 	flag.BoolVar(&stat, "stat", false, "dump statistics after program exit")
 	flag.BoolVar(&stat, "s", false, "dump statistics after program exit (shorthand)")
+
+	flag.BoolVar(&check, "check", false, "make parsing and typechecking only")
+	flag.BoolVar(&check, "c", false, "make parsing and typechecking only (shorthand)")
 }
 
 func doMain() int {
@@ -56,7 +60,21 @@ func doMain() int {
 		input = os.Stdin
 	}
 
-	if err := in.Run(input); err != nil {
+	if err := in.Parse(input); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		return 1
+	}
+
+	if err := in.Check(); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		return 1
+	}
+
+	if check {
+		return 0
+	}
+
+	if err := in.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return 1
 	}

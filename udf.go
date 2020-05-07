@@ -12,9 +12,10 @@ import (
 // User-defined functions
 
 type FuncInterpret struct {
-	interpret *Interpret
-	name      string
-	bodies    []*FuncImpl
+	interpret  *Interpret
+	name       string
+	bodies     []*FuncImpl
+	returnType Type
 }
 
 type FuncImpl struct {
@@ -57,7 +58,10 @@ func NewFuncInterpret(i *Interpret, name string) *FuncInterpret {
 	}
 }
 
-func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr, memo bool) error {
+func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr, memo bool, returnType Type) error {
+	if len(f.bodies) > 0 && returnType != f.returnType {
+		return fmt.Errorf("Cannot redefine return type: previous %v, current %v", f.returnType, returnType)
+	}
 	if argfmt == nil {
 		f.bodies = append(f.bodies, NewFuncImpl(nil, body, memo))
 		return nil
@@ -72,6 +76,7 @@ func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr, memo bool) error {
 	default:
 		return fmt.Errorf("Expected arguments signature, found: %v", argfmt)
 	}
+	f.returnType = returnType
 	return nil
 }
 
@@ -90,6 +95,10 @@ func (f *FuncInterpret) Eval(args []Expr) (Expr, error) {
 	}
 	run.cleanup()
 	return res, err
+}
+
+func (f *FuncInterpret) ReturnType() Type {
+	return f.returnType
 }
 
 type FuncRuntime struct {
@@ -468,7 +477,7 @@ func (f *FuncRuntime) evalLambda(se *Sexpr) (Expr, error) {
 	name := f.fi.interpret.NewLambdaName()
 	fi := NewFuncInterpret(f.fi.interpret, name)
 	body := f.replaceVars(se.List)
-	fi.AddImpl(nil, body, false)
+	fi.AddImpl(nil, body, false, TypeAny)
 	f.fi.interpret.funcs[name] = fi
 	return Ident(name), nil
 }
