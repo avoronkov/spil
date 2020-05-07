@@ -166,6 +166,8 @@ func (f *FuncRuntime) bind(args []Expr) (impl *FuncImpl, result Expr, err error)
 }
 
 func (f *FuncRuntime) Eval(impl *FuncImpl) (res Expr, err error) {
+	memoImpl := impl
+	memoArgs := f.args
 L:
 	for {
 		last := len(impl.body) - 1
@@ -178,17 +180,17 @@ L:
 				}
 				lst, ok := e.(*Sexpr)
 				if !ok {
-					if impl.memo {
+					if memoImpl.memo {
 						// lets remenber the result
-						impl.RememberResult(f.fi.name, f.args, e)
+						memoImpl.RememberResult(f.fi.name, memoArgs, e)
 					}
 					// nothing to evaluate
 					return e, nil
 				}
 				if lst.Quoted || lst.Len() == 0 {
-					if impl.memo {
+					if memoImpl.memo {
 						// lets remenber the result
-						impl.RememberResult(f.fi.name, f.args, lst)
+						memoImpl.RememberResult(f.fi.name, memoArgs, lst)
 					}
 					return lst, nil
 				}
@@ -199,9 +201,9 @@ L:
 					if err != nil {
 						return nil, err
 					}
-					if impl.memo {
+					if memoImpl.memo {
 						// lets remenber the result
-						impl.RememberResult(f.fi.name, f.args, result)
+						memoImpl.RememberResult(f.fi.name, f.args, result)
 					}
 					return result, nil
 				}

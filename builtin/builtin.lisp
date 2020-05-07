@@ -2,7 +2,7 @@
 
 ;; lazy filter
 (def filter (pred lst)
-	 (set 
+	 (set
 	   filt
 	   (lambda
 		 (if (empty _1)
@@ -11,6 +11,17 @@
 			 (list (head _1) (tail _1))
 			 (self (tail _1))))))
 	 (gen filt lst))
+
+(def filter' (pred lst)
+	 (set
+	   filt
+	   (lambda
+		 (if (empty _1)
+		   '()
+		   (if (pred (head _1))
+			 (list (head _1) (tail _1))
+			 (self (tail _1))))))
+	 (gen' filt lst))
 
 
 ;; lazy map
@@ -23,6 +34,14 @@
 		   (list (fn (head _1)) (tail _1)))))
 	 (gen iter lst))
 
+(def map' (fn lst)
+	 (set
+	   iter
+	   (lambda
+		 (if (empty _1)
+		   '()
+		   (list (fn (head _1)) (tail _1)))))
+	 (gen' iter lst))
 
 ;; take first n values from list
 (def take (n lst)
@@ -43,7 +62,7 @@
 
 
 ;; take elements from list while condition is true
-(def take-while (pred lst) 
+(def take-while (pred lst)
 	 (set
 	   iter
 	   (lambda
@@ -77,7 +96,7 @@
 (def concat lists
 	 ; return one element at the time
 	 (set iter
-		  (lambda 
+		  (lambda
 			(set h (first _1))
 			(set t (second _1))
 			(if (empty h)

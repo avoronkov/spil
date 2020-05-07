@@ -11,7 +11,9 @@
 
 
 ;; split string into lazy list of words
-(def words (str)  (gen \(next-string space _1) str))
+(def words (str)  (gen  \(next-string space _1) str))
+(def words' (str) (gen' \(next-string space _1) str))
 
 ;; split string into lazy list of lines
-(def lines (str)  (gen \(next-string eol _1) str))
+(def lines (str)  (gen  \(next-string eol _1) str))
+(def lines' (str) (gen' \(next-string eol _1) str))

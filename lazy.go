@@ -98,7 +98,7 @@ func (l *LazyList) next() (value Expr, state Expr, err error) {
 	args := []Expr{l.state}
 	expr, err := l.iter.Eval(args)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("LazyList: Eval(%v) failed: %v", args, err)
 	}
 	res, ok := expr.(*Sexpr)
 	if !ok {
