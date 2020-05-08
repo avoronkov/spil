@@ -560,25 +560,46 @@ func matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {
 			if !ok {
 				return false
 			}
-			if arg.V != nil && !arg.V.(Int).Eq(v) {
-				return false
+			if arg.V != nil {
+				if !arg.V.(Int).Eq(v) {
+					return false
+				}
+			} else if binded, ok := binds[arg.Name]; ok {
+				if binded.String() != v.String() {
+					return false
+				}
 			}
+			binds[arg.Name] = v
 		case TypeStr:
 			v, ok := args[i].(Str)
 			if !ok {
 				return false
 			}
-			if arg.V != nil && arg.V.(Str) != v {
-				return false
+			if arg.V != nil {
+				if arg.V.(Str) != v {
+					return false
+				}
+			} else if binded, ok := binds[arg.Name]; ok {
+				if binded.String() != v.String() {
+					return false
+				}
 			}
+			binds[arg.Name] = v
 		case TypeBool:
 			v, ok := args[i].(Bool)
 			if !ok {
 				return false
 			}
-			if arg.V != nil && arg.V.(Bool) != v {
-				return false
+			if arg.V != nil {
+				if arg.V.(Bool) != v {
+					return false
+				}
+			} else if binded, ok := binds[arg.Name]; ok {
+				if binded.String() != v.String() {
+					return false
+				}
 			}
+			binds[arg.Name] = v
 		case TypeList:
 			_, ok := args[i].(List)
 			if !ok {
