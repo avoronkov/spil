@@ -364,6 +364,9 @@ func FOpen(args []Expr) (Expr, error) {
 // Binders
 func AllInts(args []Expr) error {
 	for i, arg := range args {
+		if arg == Everything {
+			continue
+		}
 		if _, ok := arg.(Int); !ok {
 			return fmt.Errorf("Expected all integer arguments, found%v at position %v", arg, i)
 		}
@@ -376,11 +379,11 @@ func TwoInts(args []Expr) error {
 		return fmt.Errorf("expected 2 arguments, found %v", args)
 	}
 	_, ok := args[0].(Int)
-	if !ok {
+	if !ok && args[0] != Everything {
 		return fmt.Errorf("first argument should be integer, found %v", args[0])
 	}
 	_, ok = args[1].(Int)
-	if !ok {
+	if !ok && args[1] != Everything {
 		return fmt.Errorf("second argument should be integer, found %v", args[1])
 	}
 	return nil
@@ -398,7 +401,7 @@ func OneBoolArg(args []Expr) error {
 		return fmt.Errorf("expected 1 argument, found %v", args)
 	}
 	_, ok := args[0].(Bool)
-	if !ok {
+	if !ok && args[0] != Everything {
 		return fmt.Errorf("expected argument to be Bool, found %v", args[0])
 	}
 	return nil
@@ -413,7 +416,7 @@ func ListArg(args []Expr) error {
 		return fmt.Errorf("expected 1 argument, found %v", args)
 	}
 	_, ok := args[0].(List)
-	if !ok {
+	if !ok && args[0] != Everything {
 		return fmt.Errorf("expected argument to be List, found %v", args[0])
 	}
 	return nil
@@ -424,7 +427,7 @@ func AppenderArgs(args []Expr) error {
 		return nil
 	}
 	_, ok := args[0].(Appender)
-	if !ok {
+	if !ok && args[0] != Everything {
 		return fmt.Errorf("FAppend: expected first argument to be Appender, found %v", args[0])
 	}
 	return nil
@@ -435,7 +438,7 @@ func StrArg(args []Expr) error {
 		return fmt.Errorf("expected exaclty one argument, found %v", args)
 	}
 	_, ok := args[0].(Str)
-	if !ok {
+	if !ok && args[0] != Everything {
 		return fmt.Errorf("expected argument to be Str, found %v", args)
 	}
 	return nil

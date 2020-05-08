@@ -8,7 +8,8 @@ import (
 type Type int
 
 const (
-	TypeAny Type = iota
+	TypeUnknown Type = iota
+	TypeAny
 	TypeInt
 	TypeStr
 	TypeBool
@@ -18,6 +19,8 @@ const (
 
 func (t Type) String() string {
 	switch t {
+	case TypeUnknown:
+		return ":unknown"
 	case TypeAny:
 		return ":any"
 	case TypeInt:
@@ -50,7 +53,7 @@ func ParseType(token string) (Type, bool) {
 	case ":list":
 		return TypeList, true
 	default:
-		return TypeAny, false
+		return TypeUnknown, false
 	}
 }
 
@@ -121,7 +124,7 @@ func ParseArgFmt(argfmt Expr) (*ArgFmt, error) {
 					}
 					result.Args = append(result.Args, Arg{string(r)[:colon], tp, nil})
 				} else {
-					result.Args = append(result.Args, Arg{string(r), TypeAny, nil})
+					result.Args = append(result.Args, Arg{string(r), TypeUnknown, nil})
 				}
 			}
 		}

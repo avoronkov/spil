@@ -53,8 +53,9 @@ func (i *FuncImpl) RememberResult(name string, args []Expr, result Expr) {
 
 func NewFuncInterpret(i *Interpret, name string) *FuncInterpret {
 	return &FuncInterpret{
-		interpret: i,
-		name:      name,
+		interpret:  i,
+		name:       name,
+		returnType: TypeUnknown,
 	}
 }
 
@@ -385,8 +386,8 @@ func (f *FuncRuntime) evalExpr(expr Expr) (Expr, error) {
 
 // (var-name) (value)
 func (f *FuncRuntime) setVar(se *Sexpr, scoped bool) error {
-	if se.Len() != 2 {
-		return fmt.Errorf("set wants 2 argument, found %v", se)
+	if se.Len() != 2 && se.Len() != 3 {
+		return fmt.Errorf("set wants 2 or 3 arguments, found %v", se)
 	}
 	name, ok := se.List[0].(Ident)
 	if !ok {
@@ -549,6 +550,10 @@ func matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {
 		return false
 	}
 	for i, arg := range argfmt.Args {
+		if args[i] == Everything {
+			// TODO write warning in strict mode?
+			continue
+		}
 		switch arg.T {
 		case TypeInt:
 			v, ok := args[i].(Int)
@@ -605,7 +610,7 @@ func matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {
 					return false
 				}
 			}
-		case TypeAny:
+		case TypeAny, TypeUnknown:
 			// check if param is already binded
 			if val, ok := binds[arg.Name]; ok {
 				if val.String() != args[i].String() {

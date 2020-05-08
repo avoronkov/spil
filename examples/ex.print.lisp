@@ -7,7 +7,7 @@
 (print -1)
 
 (print "hello world")
-(print id)
+; (print id)
 
 (print '(1 2 3))
 

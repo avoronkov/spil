@@ -216,3 +216,19 @@ func (s *Sexpr) Append(args []Expr) (Expr, error) {
 		Quoted: s.Quoted,
 	}, nil
 }
+
+type everything struct{}
+
+var Everything Expr = everything{}
+
+func (e everything) Hash() (string, error) {
+	return "", fmt.Errorf("Everything cannot be hashed")
+}
+
+func (e everything) Print(w io.Writer) {
+	fmt.Fprintf(w, "Everything cannot be printed")
+}
+
+func (e everything) String() string {
+	return "{Everything}"
+}

@@ -193,7 +193,7 @@ func (i *Interpret) defineFunc(se *Sexpr, memo bool) error {
 		i.funcs[fname] = fi
 	}
 	bodyIndex := 2
-	returnType := TypeAny
+	returnType := TypeUnknown
 	// Check if return type is specified
 	if identType, ok := se.List[2].(Ident); ok {
 		returnType, ok = ParseType(string(identType))
@@ -299,7 +299,7 @@ func (i *Interpret) CheckReturnTypes() error {
 			if err != nil {
 				return err
 			}
-			if fi.returnType != TypeAny {
+			if fi.returnType != TypeAny && fi.returnType != TypeUnknown {
 				if t != fi.returnType {
 					return fmt.Errorf("Incorrect return value in function %v(%v): expected %v actual %v", fi.name, impl.argfmt, fi.returnType, t)
 				}
@@ -310,6 +310,10 @@ func (i *Interpret) CheckReturnTypes() error {
 }
 
 func (in *Interpret) evalBodyType(fname string, body []Expr, vars map[string]Type) (rt Type, err error) {
+	if len(body) == 0 {
+		// This should be possible only for __main__ function
+		return TypeAny, err
+	}
 
 L:
 	for i, stt := range body[:len(body)-1] {
@@ -370,7 +374,7 @@ L:
 	return in.exprType(fname, body[len(body)-1], vars)
 }
 
-func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (Type, error) {
+func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result Type, err error) {
 	switch a := e.(type) {
 	case Int:
 		return TypeInt, nil
@@ -406,8 +410,28 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (Type, 
 		case "gen", "gen'":
 			return TypeList, nil
 		case "apply":
-			tail, _ := a.Tail()
-			return i.exprType(fname, tail, vars)
+			if len(a.List) != 3 {
+				return 0, fmt.Errorf("%v: incorrect number of arguments to 'apply': %v", fname, a.List)
+			}
+			ftype, err := i.exprType(fname, a.List[1], vars)
+			if err != nil {
+				return 0, err
+			}
+			if ftype != TypeFunc {
+				return 0, fmt.Errorf("%v: apply expects function on first place, found: %v", fname, a.List[1])
+			}
+			atype, err := i.exprType(fname, a.List[2], vars)
+			if err != nil {
+				return 0, err
+			}
+			if atype != TypeList && atype != TypeUnknown {
+				return 0, fmt.Errorf("%v: apply expects list on second place, found: %v", fname, a.List[2])
+			}
+			fi, ok := i.funcs[string(a.List[1].(Ident))]
+			if !ok {
+				return 0, fmt.Errorf("%v: unknown function supplied to apply: %v", fname, a.List[1])
+			}
+			return fi.ReturnType(), nil
 		case "if":
 			if len(a.List) != 4 {
 				return 0, fmt.Errorf("%v: incorrect number of arguments to 'if': %v", fname, a.List)
@@ -416,7 +440,7 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (Type, 
 			if err != nil {
 				return 0, err
 			}
-			if condType != TypeBool {
+			if condType != TypeBool && condType != TypeUnknown {
 				return 0, fmt.Errorf("%v: condition in if-statement should return :bool, found: %v", fname, condType)
 			}
 			t1, err := i.exprType(fname, a.List[2], vars)
@@ -427,11 +451,11 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (Type, 
 			if err != nil {
 				return 0, err
 			}
-			if t1 == TypeAny || t2 == TypeAny {
-				return TypeAny, nil
+			if t1 == TypeUnknown || t2 == TypeUnknown {
+				return TypeUnknown, nil
 			}
 			if t1 != t2 {
-				return 0, fmt.Errorf("Different types returned by if-statement: %v != %v", t1, t2)
+				return TypeAny, nil
 			}
 			return t1, nil
 		default:
@@ -452,20 +476,20 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (Type, 
 					if a.Empty() || a.Quoted {
 						args = append(args, a)
 					} else if a.Lambda {
-						args = append(args, fakeArg(TypeFunc))
+						args = append(args, i.fakeArg(TypeFunc))
 					} else {
 						itemType, err := i.exprType(fname, item, vars)
 						if err != nil {
 							return 0, err
 						}
-						args = append(args, fakeArg(itemType))
+						args = append(args, i.fakeArg(itemType))
 					}
 				case Ident:
 					itemType, err := i.exprType(fname, item, vars)
 					if err != nil {
 						return 0, err
 					}
-					args = append(args, fakeArg(itemType))
+					args = append(args, i.fakeArg(itemType))
 				default:
 					panic(fmt.Errorf("%v: unexpected type: %v", fname, item))
 				}
@@ -482,18 +506,23 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (Type, 
 	return TypeAny, nil
 }
 
-func fakeArg(t Type) Expr {
+func (i *Interpret) fakeArg(t Type) Expr {
 	switch t {
 	case TypeInt:
-		return Int64(-1339)
+		v, _ := i.parseInt("-1339")
+		return v
 	case TypeStr:
 		return Str("asdfasdlakdfa'adfask$%@")
 	case TypeBool:
 		return Bool(false)
 	case TypeList:
 		return QList(QEmpty, Int64(-1339))
-	case TypeFunc, TypeAny:
+	case TypeFunc:
 		return Ident("__fake_function_name_adfaf12312f")
+	case TypeAny:
+		return Ident("__any_object_1299")
+	case TypeUnknown:
+		return Everything
 	default:
 		panic(fmt.Errorf("Unexpected Type: %v", t))
 	}

@@ -79,7 +79,7 @@
 
 ;; take nth element from list.
 ;; Elements numeration is started from 1 (!).
-(def nth (n lst) (head (drop (- n 1) lst)))
+(def nth (n:int lst:list) :any (head (drop (- n 1) lst)))
 
 
 (def first  (lst) (nth 1 lst))
