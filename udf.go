@@ -76,6 +76,12 @@ func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr, memo bool, returnType 
 	return nil
 }
 
+func (f *FuncInterpret) TryBind(args []Expr) error {
+	run := NewFuncRuntime(f)
+	_, _, err := run.bind(args)
+	return err
+}
+
 func (f *FuncInterpret) Eval(args []Expr) (Expr, error) {
 	run := NewFuncRuntime(f)
 	impl, result, err := run.bind(args)

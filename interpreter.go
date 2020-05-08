@@ -29,27 +29,27 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 		parseInt:   ParseInt64,
 	}
 	i.funcs = map[string]Evaler{
-		"+":      EvalerFunc(FPlus, TypeInt),
-		"-":      EvalerFunc(FMinus, TypeInt),
-		"*":      EvalerFunc(FMultiply, TypeInt),
-		"/":      EvalerFunc(FDiv, TypeInt),
-		"mod":    EvalerFunc(FMod, TypeInt),
-		"<":      EvalerFunc(FLess, TypeBool),
-		"<=":     EvalerFunc(FLessEq, TypeBool),
-		">":      EvalerFunc(FMore, TypeBool),
-		">=":     EvalerFunc(FMoreEq, TypeBool),
-		"=":      EvalerFunc(FEq, TypeBool),
-		"not":    EvalerFunc(FNot, TypeBool),
-		"print":  EvalerFunc(i.FPrint, TypeAny),
-		"head":   EvalerFunc(FHead, TypeAny),
-		"tail":   EvalerFunc(FTail, TypeList),
-		"append": EvalerFunc(FAppend, TypeList),
-		"list":   EvalerFunc(FList, TypeList),
-		"space":  EvalerFunc(FSpace, TypeBool),
-		"eol":    EvalerFunc(FEol, TypeBool),
-		"empty":  EvalerFunc(FEmpty, TypeBool),
-		"int":    EvalerFunc(i.FInt, TypeInt),
-		"open":   EvalerFunc(FOpen, TypeStr),
+		"+":      EvalerFunc(FPlus, AllInts, TypeInt),
+		"-":      EvalerFunc(FMinus, AllInts, TypeInt),
+		"*":      EvalerFunc(FMultiply, AllInts, TypeInt),
+		"/":      EvalerFunc(FDiv, AllInts, TypeInt),
+		"mod":    EvalerFunc(FMod, TwoInts, TypeInt),
+		"<":      EvalerFunc(FLess, TwoInts, TypeBool),
+		"<=":     EvalerFunc(FLessEq, TwoInts, TypeBool),
+		">":      EvalerFunc(FMore, TwoInts, TypeBool),
+		">=":     EvalerFunc(FMoreEq, TwoInts, TypeBool),
+		"=":      EvalerFunc(FEq, TwoArgs, TypeBool),
+		"not":    EvalerFunc(FNot, OneBoolArg, TypeBool),
+		"print":  EvalerFunc(i.FPrint, AnyArgs, TypeAny),
+		"head":   EvalerFunc(FHead, ListArg, TypeAny),
+		"tail":   EvalerFunc(FTail, ListArg, TypeList),
+		"append": EvalerFunc(FAppend, AppenderArgs, TypeList),
+		"list":   EvalerFunc(FList, AnyArgs, TypeList),
+		"space":  EvalerFunc(FSpace, StrArg, TypeBool),
+		"eol":    EvalerFunc(FEol, StrArg, TypeBool),
+		"empty":  EvalerFunc(FEmpty, ListArg, TypeBool),
+		"int":    EvalerFunc(i.FInt, StrArg, TypeInt),
+		"open":   EvalerFunc(FOpen, StrArg, TypeStr),
 	}
 	return i
 }
@@ -286,24 +286,27 @@ func (i *Interpret) CheckReturnTypes() error {
 			// native function
 			continue
 		}
-		if fi.returnType == TypeAny {
-			continue
-		}
+		/*
+			if fi.returnType == TypeAny {
+				continue
+			}
+		*/
 		for _, impl := range fi.bodies {
-			t, err := i.evalBodyType(impl.body, impl.argfmt.Values())
+			t, err := i.evalBodyType(fi.name, impl.body, impl.argfmt.Values())
 			if err != nil {
 				return err
 			}
-			if t != fi.returnType {
-				return fmt.Errorf("Incorrect return value in function %v(%v): expected %v actual %v", fi.name, impl.argfmt, fi.returnType, t)
-
+			if fi.returnType != TypeAny {
+				if t != fi.returnType {
+					return fmt.Errorf("Incorrect return value in function %v(%v): expected %v actual %v", fi.name, impl.argfmt, fi.returnType, t)
+				}
 			}
 		}
 	}
 	return nil
 }
 
-func (in *Interpret) evalBodyType(body []Expr, vars map[string]Type) (rt Type, err error) {
+func (in *Interpret) evalBodyType(fname string, body []Expr, vars map[string]Type) (rt Type, err error) {
 
 L:
 	for i, stt := range body[:len(body)-1] {
@@ -339,21 +342,32 @@ L:
 					}
 					vars[string(varname)] = tp
 				} else if len(a.List) == 3 {
-					tp, err := in.exprType(a.List[2], vars)
+					tp, err := in.exprType(fname, a.List[2], vars)
 					if err != nil {
 						return 0, err
 					}
 					vars[string(varname)] = tp
 				} else {
-					return 0, fmt.Errorf("Incorrect number of arguments to %v: %v", name, a.List)
+					return 0, fmt.Errorf("%v: incorrect number of arguments %v: %v", fname, name, a.List)
+				}
+			case "print":
+				for i, arg := range a.List[1:] {
+					_, err := in.exprType(fname, arg, vars)
+					if err != nil {
+						return 0, fmt.Errorf("%v: incorrect argument to print at posision %v: %v", fname, i, err)
+					}
+				}
+			default:
+				if _, err := in.exprType(fname, a, vars); err != nil {
+					return 0, fmt.Errorf("%v: %v", fname, err)
 				}
 			}
 		}
 	}
-	return in.exprType(body[len(body)-1], vars)
+	return in.exprType(fname, body[len(body)-1], vars)
 }
 
-func (i *Interpret) exprType(e Expr, vars map[string]Type) (Type, error) {
+func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (Type, error) {
 	switch a := e.(type) {
 	case Int:
 		return TypeInt, nil
@@ -377,11 +391,11 @@ func (i *Interpret) exprType(e Expr, vars map[string]Type) (Type, error) {
 		}
 		ident, ok := a.List[0].(Ident)
 		if !ok {
-			return 0, fmt.Errorf("Expected ident, found: %v", a.List[0])
+			return 0, fmt.Errorf("%v: expected ident, found: %v", fname, a.List[0])
 		}
 		switch name := string(ident); name {
 		case "set", "set'":
-			return 0, fmt.Errorf("Unexpected %v and the end of function", ident)
+			return 0, fmt.Errorf("%v: unexpected %v and the end of function", fname, ident)
 		case "lambda":
 			return TypeFunc, nil
 		case "and", "or":
@@ -390,33 +404,94 @@ func (i *Interpret) exprType(e Expr, vars map[string]Type) (Type, error) {
 			return TypeList, nil
 		case "apply":
 			tail, _ := a.Tail()
-			return i.exprType(tail, vars)
+			return i.exprType(fname, tail, vars)
 		case "if":
 			if len(a.List) != 4 {
-				return 0, fmt.Errorf("Incorrect number of arguments to 'if'")
+				return 0, fmt.Errorf("%v: incorrect number of arguments to 'if': %v", fname, a.List)
 			}
-			t1, err := i.exprType(a.List[2], vars)
+			condType, err := i.exprType(fname, a.List[1], vars)
 			if err != nil {
 				return 0, err
 			}
-			t2, err := i.exprType(a.List[3], vars)
+			if condType != TypeBool {
+				return 0, fmt.Errorf("%v: condition in if-statement should return :bool, found: %v", fname, condType)
+			}
+			t1, err := i.exprType(fname, a.List[2], vars)
 			if err != nil {
 				return 0, err
+			}
+			t2, err := i.exprType(fname, a.List[3], vars)
+			if err != nil {
+				return 0, err
+			}
+			if t1 == TypeAny || t2 == TypeAny {
+				return TypeAny, nil
 			}
 			if t1 != t2 {
-				return 0, fmt.Errorf("Different type in if-statement: %v != %v", t1, t2)
+				return 0, fmt.Errorf("Different types returned by if-statement: %v != %v", t1, t2)
 			}
 			return t1, nil
 		default:
 			// this is a function call
-			if f, ok := i.funcs[name]; ok {
-				return f.ReturnType(), nil
-			} else {
-				fmt.Fprintf(os.Stderr, "Cannot detect return type of function %v", name)
+			f, ok := i.funcs[name]
+			if !ok {
+				fmt.Fprintf(os.Stderr, "%v: cannot detect return type of function %v\n", fname, name)
 				return TypeAny, nil
 			}
+
+			// check if we have matching func impl
+			args := []Expr{}
+			for _, item := range a.List[1:] {
+				switch a := item.(type) {
+				case Int, Str, Bool:
+					args = append(args, a)
+				case *Sexpr:
+					if a.Empty() || a.Quoted {
+						args = append(args, a)
+					} else if a.Lambda {
+						args = append(args, fakeArg(TypeFunc))
+					} else {
+						itemType, err := i.exprType(fname, item, vars)
+						if err != nil {
+							return 0, err
+						}
+						args = append(args, fakeArg(itemType))
+					}
+				case Ident:
+					itemType, err := i.exprType(fname, item, vars)
+					if err != nil {
+						return 0, err
+					}
+					args = append(args, fakeArg(itemType))
+				default:
+					panic(fmt.Errorf("%v: unexpected type: %v", fname, item))
+				}
+			}
+			err := f.TryBind(args)
+			if err != nil {
+				return 0, fmt.Errorf("%v: %v", fname, err)
+			}
+
+			return f.ReturnType(), nil
 		}
 	}
 	fmt.Fprintf(os.Stderr, "Unexpected return. (TypeAny)\n")
 	return TypeAny, nil
+}
+
+func fakeArg(t Type) Expr {
+	switch t {
+	case TypeInt:
+		return Int64(-1339)
+	case TypeStr:
+		return Str("asdfasdlakdfa'adfask$%@")
+	case TypeBool:
+		return Bool(false)
+	case TypeList:
+		return QList(QEmpty, Int64(-1339))
+	case TypeFunc, TypeAny:
+		return Ident("__fake_function_name_adfaf12312f")
+	default:
+		panic(fmt.Errorf("Unexpected Type: %v", t))
+	}
 }

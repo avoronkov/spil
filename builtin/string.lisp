@@ -3,7 +3,8 @@
 (def next-string (sep '() "") '())
 (def next-string (sep '() acc) (list acc ""))
 (def next-string (sep str acc)
-	 (if (sep (head str))
+	 (set is-sep (sep (head str)) :bool)
+	 (if is-sep
 	   (if (= acc "")
 		 (next-string sep (tail str) acc)
 		 (list acc (tail str)))

@@ -9,11 +9,13 @@ import (
 type Evaler interface {
 	Eval([]Expr) (Expr, error)
 	ReturnType() Type
+	TryBind(args []Expr) error
 }
 
 type nativeFunc struct {
-	fn  func([]Expr) (Expr, error)
-	ret Type
+	fn     func([]Expr) (Expr, error)
+	ret    Type
+	binder func([]Expr) error
 }
 
 func (n *nativeFunc) Eval(args []Expr) (Expr, error) {
@@ -24,10 +26,15 @@ func (n *nativeFunc) ReturnType() Type {
 	return n.ret
 }
 
-func EvalerFunc(fn func([]Expr) (Expr, error), ret Type) Evaler {
+func (n *nativeFunc) TryBind(args []Expr) error {
+	return n.binder(args)
+}
+
+func EvalerFunc(fn func([]Expr) (Expr, error), binder func([]Expr) error, ret Type) Evaler {
 	return &nativeFunc{
-		fn:  fn,
-		ret: ret,
+		fn:     fn,
+		ret:    ret,
+		binder: binder,
 	}
 }
 
@@ -346,4 +353,84 @@ func FOpen(args []Expr) (Expr, error) {
 		return nil, err
 	}
 	return NewLazyInput(file), nil
+}
+
+// Binders
+func AllInts(args []Expr) error {
+	for i, arg := range args {
+		if _, ok := arg.(Int); !ok {
+			return fmt.Errorf("Expected all integer arguments, found%v at position %v", arg, i)
+		}
+	}
+	return nil
+}
+
+func TwoInts(args []Expr) error {
+	if len(args) != 2 {
+		return fmt.Errorf("expected 2 arguments, found %v", args)
+	}
+	_, ok := args[0].(Int)
+	if !ok {
+		return fmt.Errorf("first argument should be integer, found %v", args[0])
+	}
+	_, ok = args[1].(Int)
+	if !ok {
+		return fmt.Errorf("second argument should be integer, found %v", args[1])
+	}
+	return nil
+}
+
+func TwoArgs(args []Expr) error {
+	if len(args) != 2 {
+		return fmt.Errorf("expected 2 arguments, found %v", args)
+	}
+	return nil
+}
+
+func OneBoolArg(args []Expr) error {
+	if len(args) != 1 {
+		return fmt.Errorf("expected 1 argument, found %v", args)
+	}
+	_, ok := args[0].(Bool)
+	if !ok {
+		return fmt.Errorf("expected argument to be Bool, found %v", args[0])
+	}
+	return nil
+}
+
+func AnyArgs(args []Expr) error {
+	return nil
+}
+
+func ListArg(args []Expr) error {
+	if len(args) != 1 {
+		return fmt.Errorf("expected 1 argument, found %v", args)
+	}
+	_, ok := args[0].(List)
+	if !ok {
+		return fmt.Errorf("expected argument to be List, found %v", args[0])
+	}
+	return nil
+}
+
+func AppenderArgs(args []Expr) error {
+	if len(args) <= 1 {
+		return nil
+	}
+	_, ok := args[0].(Appender)
+	if !ok {
+		return fmt.Errorf("FAppend: expected first argument to be Appender, found %v", args[0])
+	}
+	return nil
+}
+
+func StrArg(args []Expr) error {
+	if len(args) != 1 {
+		return fmt.Errorf("expected exaclty one argument, found %v", args)
+	}
+	_, ok := args[0].(Str)
+	if !ok {
+		return fmt.Errorf("expected argument to be Str, found %v", args)
+	}
+	return nil
 }
