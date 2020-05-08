@@ -60,6 +60,20 @@ type ArgFmt struct {
 	Wildcard string
 }
 
+func (a *ArgFmt) Values() map[string]Type {
+	m := make(map[string]Type)
+	if a.Wildcard != "" {
+		m[a.Wildcard] = TypeList
+	} else {
+		for _, arg := range a.Args {
+			if arg.Name != "" {
+				m[arg.Name] = arg.T
+			}
+		}
+	}
+	return m
+}
+
 func MakeArgFmt(args ...Arg) (a *ArgFmt) {
 	a = &ArgFmt{}
 	for _, arg := range args {

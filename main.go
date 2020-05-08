@@ -11,10 +11,11 @@ import (
 )
 
 var (
-	trace  bool
-	bigint bool
-	stat   bool
-	check  bool
+	trace     bool
+	bigint    bool
+	stat      bool
+	check     bool
+	noBuiltin bool
 )
 
 func init() {
@@ -29,6 +30,9 @@ func init() {
 
 	flag.BoolVar(&check, "check", false, "make parsing and typechecking only")
 	flag.BoolVar(&check, "c", false, "make parsing and typechecking only (shorthand)")
+
+	flag.BoolVar(&noBuiltin, "no-builtin", false, "do not load std library functions")
+	flag.BoolVar(&noBuiltin, "B", false, "do not load std library functions (shorthand)")
 }
 
 func doMain() int {
@@ -37,12 +41,16 @@ func doMain() int {
 		log.SetOutput(ioutil.Discard)
 	}
 
-	builtinDir, err := getBuiltinDir()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		return 1
+	builtinDir := ""
+	if !noBuiltin {
+		var err error
+		builtinDir, err = getBuiltinDir()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			return 1
+		}
+		log.Printf("builtin: %v\n", builtinDir)
 	}
-	log.Printf("builtin: %v\n", builtinDir)
 
 	in := NewInterpreter(os.Stdout, builtinDir)
 	in.UseBigInt(bigint)

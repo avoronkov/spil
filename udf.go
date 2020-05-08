@@ -526,12 +526,6 @@ func (f *FuncRuntime) evalApply(se *Sexpr) (Expr, error) {
 }
 
 func matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {
-	/*
-		defer func() {
-			fmt.Fprintf(os.Stderr, "matchArgs(%v) over %v = %v\n", argfmt, nil, result)
-		}()
-	*/
-
 	if argfmt == nil {
 		// null matches everything (lambda case)
 		return true
@@ -551,7 +545,6 @@ func matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {
 	for i, arg := range argfmt.Args {
 		switch arg.T {
 		case TypeInt:
-			fmt.Fprintf(os.Stderr, "Match TypeInt\n")
 			v, ok := args[i].(Int)
 			if !ok {
 				return false
@@ -560,7 +553,6 @@ func matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {
 				return false
 			}
 		case TypeStr:
-			fmt.Fprintf(os.Stderr, "Match TypeStr\n")
 			v, ok := args[i].(Str)
 			if !ok {
 				return false
@@ -569,7 +561,6 @@ func matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {
 				return false
 			}
 		case TypeBool:
-			fmt.Fprintf(os.Stderr, "Match TypeBool\n")
 			v, ok := args[i].(Bool)
 			if !ok {
 				return false
@@ -578,7 +569,6 @@ func matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {
 				return false
 			}
 		case TypeList:
-			fmt.Fprintf(os.Stderr, "Match TypeList\n")
 			_, ok := args[i].(List)
 			if !ok {
 				return false

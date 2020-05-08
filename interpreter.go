@@ -280,7 +280,6 @@ func (in *Interpret) Stat() {
 }
 
 func (i *Interpret) CheckReturnTypes() error {
-	fmt.Fprintf(os.Stderr, "CheckReturnTypes()\n")
 	for _, fn := range i.funcs {
 		fi, ok := fn.(*FuncInterpret)
 		if !ok {
@@ -290,74 +289,134 @@ func (i *Interpret) CheckReturnTypes() error {
 		if fi.returnType == TypeAny {
 			continue
 		}
-		fmt.Fprintf(os.Stderr, "CheckReturnTypes: %v\n", fi.name)
 		for _, impl := range fi.bodies {
-			if err := i.checkExprType(impl.body[len(impl.body)-1], fi.returnType); err != nil {
-				return fmt.Errorf("Incorrect return value in function %v(%v): %v", fi.name, impl.argfmt, err)
+			t, err := i.evalBodyType(impl.body, impl.argfmt.Values())
+			if err != nil {
+				return err
+			}
+			if t != fi.returnType {
+				return fmt.Errorf("Incorrect return value in function %v(%v): expected %v actual %v", fi.name, impl.argfmt, fi.returnType, t)
+
 			}
 		}
 	}
 	return nil
 }
 
-func (i *Interpret) checkExprType(e Expr, rtype Type) error {
-	var act Type
+func (in *Interpret) evalBodyType(body []Expr, vars map[string]Type) (rt Type, err error) {
+
+L:
+	for i, stt := range body[:len(body)-1] {
+		_ = i
+		switch a := stt.(type) {
+		case Int, Str, Bool, Ident:
+			continue L
+		case *Sexpr:
+			if a.Quoted || a.Empty() {
+				continue L
+			}
+			ident, ok := a.List[0].(Ident)
+			if !ok {
+				return 0, fmt.Errorf("Expected ident, found: %v", a.List[0])
+			}
+			switch name := string(ident); name {
+			case "set", "set'":
+				if i == len(body)-1 {
+					return 0, fmt.Errorf("Unexpected %v statement at the end of the function", name)
+				}
+				varname, ok := a.List[1].(Ident)
+				if !ok {
+					return 0, fmt.Errorf("%v: second argument should be variable name, found: %v", name, a.List[1])
+				}
+				if len(a.List) == 4 {
+					id, ok := a.List[3].(Ident)
+					if !ok {
+						return 0, fmt.Errorf("Fourth statement of %v should be type identifier, found: %v", name, a.List[3])
+					}
+					tp, ok := ParseType(string(id))
+					if !ok {
+						return 0, fmt.Errorf("Fourth statement of %v should be type identifier, found: %v", name, a.List[3])
+					}
+					vars[string(varname)] = tp
+				} else if len(a.List) == 3 {
+					tp, err := in.exprType(a.List[2], vars)
+					if err != nil {
+						return 0, err
+					}
+					vars[string(varname)] = tp
+				} else {
+					return 0, fmt.Errorf("Incorrect number of arguments to %v: %v", name, a.List)
+				}
+			}
+		}
+	}
+	return in.exprType(body[len(body)-1], vars)
+}
+
+func (i *Interpret) exprType(e Expr, vars map[string]Type) (Type, error) {
 	switch a := e.(type) {
 	case Int:
-		act = TypeInt
+		return TypeInt, nil
 	case Str:
-		act = TypeStr
+		return TypeStr, nil
 	case Bool:
-		act = TypeBool
+		return TypeBool, nil
 	case Ident:
-		// TODO
+		if t, ok := vars[string(a)]; ok {
+			return t, nil
+		} else if _, ok := i.funcs[string(a)]; ok {
+			return TypeFunc, nil
+		}
+		return 0, fmt.Errorf("Undefined variable: %v", string(a))
 	case *Sexpr:
 		if a.Quoted || a.Empty() {
-			act = TypeList
-			break
+			return TypeList, nil
 		}
 		if a.Lambda {
-			act = TypeFunc
-			break
+			return TypeFunc, nil
 		}
 		ident, ok := a.List[0].(Ident)
 		if !ok {
-			return fmt.Errorf("Expected ident, found: %v", a.List[0])
+			return 0, fmt.Errorf("Expected ident, found: %v", a.List[0])
 		}
 		switch name := string(ident); name {
 		case "set", "set'":
-			return fmt.Errorf("Unexpected %v and the end of function", ident)
+			return 0, fmt.Errorf("Unexpected %v and the end of function", ident)
 		case "lambda":
-			act = TypeFunc
+			return TypeFunc, nil
 		case "and", "or":
-			act = TypeBool
+			return TypeBool, nil
 		case "gen", "gen'":
-			act = TypeList
+			return TypeList, nil
 		case "apply":
 			tail, _ := a.Tail()
-			return i.checkExprType(tail, rtype)
+			return i.exprType(tail, vars)
 		case "if":
 			if len(a.List) != 4 {
-				return fmt.Errorf("Incorrect number of arguments to 'if'")
+				return 0, fmt.Errorf("Incorrect number of arguments to 'if'")
 			}
-			if err := i.checkExprType(a.List[2], rtype); err != nil {
-				return err
+			t1, err := i.exprType(a.List[2], vars)
+			if err != nil {
+				return 0, err
 			}
-			if err := i.checkExprType(a.List[3], rtype); err != nil {
-				return err
+			t2, err := i.exprType(a.List[3], vars)
+			if err != nil {
+				return 0, err
 			}
-			return nil
+			if t1 != t2 {
+				return 0, fmt.Errorf("Different type in if-statement: %v != %v", t1, t2)
+			}
+			return t1, nil
 		default:
 			// this is a function call
 			if f, ok := i.funcs[name]; ok {
-				act = f.ReturnType()
+				return f.ReturnType(), nil
 			} else {
 				fmt.Fprintf(os.Stderr, "Cannot detect return type of function %v", name)
+				return TypeAny, nil
 			}
 		}
 	}
-	if act != rtype {
-		return fmt.Errorf("expected %v, actual %v", rtype, act)
-	}
-	return nil
+	fmt.Fprintf(os.Stderr, "Unexpected return. (TypeAny)\n")
+	return TypeAny, nil
 }
