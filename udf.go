@@ -148,7 +148,7 @@ func (f *FuncRuntime) bind(args []Expr) (impl *FuncImpl, result Expr, err error)
 		}
 	}
 	if !argfmtFound {
-		err = fmt.Errorf("No matching function implementation for %v found", f.fi.name)
+		err = fmt.Errorf("No matching function implementation found: %v (%v)", f.fi.name, args)
 		return
 	}
 	if impl.argfmt != nil {

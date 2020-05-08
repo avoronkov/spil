@@ -7,7 +7,7 @@ import (
 )
 
 func TestLazyList(t *testing.T) {
-	var ll List = NewLazyList(EvalerFunc(testCounter, AnyArgs, TypeList), Int64(0), false)
+	var ll List = NewLazyList(EvalerFunc("__func__", testCounter, AnyArgs, TypeList), Int64(0), false)
 	res := make([]Expr, 0, 10)
 	for !ll.Empty() {
 		val, err := ll.Head()
@@ -50,7 +50,7 @@ func testCounter(args []Expr) (Expr, error) {
 }
 
 func TestLazyListState(t *testing.T) {
-	var ll List = NewLazyList(EvalerFunc(fibGen, AnyArgs, TypeList), QList(Int64(1), Int64(1)), false)
+	var ll List = NewLazyList(EvalerFunc("fibGen", fibGen, AnyArgs, TypeList), QList(Int64(1), Int64(1)), false)
 	res := make([]Expr, 0, 10)
 	for i := 0; i < 6; i++ {
 		val, err := ll.Head()
@@ -91,7 +91,7 @@ func fibGen(args []Expr) (Expr, error) {
 }
 
 func TestLazyListFiniteString(t *testing.T) {
-	ll := NewLazyList(EvalerFunc(testCounter, AnyArgs, TypeAny), Int64(0), false)
+	ll := NewLazyList(EvalerFunc("__func__", testCounter, AnyArgs, TypeAny), Int64(0), false)
 	var buffer strings.Builder
 	ll.Print(&buffer)
 	act := buffer.String()

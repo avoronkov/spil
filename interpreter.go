@@ -29,27 +29,27 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 		parseInt:   ParseInt64,
 	}
 	i.funcs = map[string]Evaler{
-		"+":      EvalerFunc(FPlus, AllInts, TypeInt),
-		"-":      EvalerFunc(FMinus, AllInts, TypeInt),
-		"*":      EvalerFunc(FMultiply, AllInts, TypeInt),
-		"/":      EvalerFunc(FDiv, AllInts, TypeInt),
-		"mod":    EvalerFunc(FMod, TwoInts, TypeInt),
-		"<":      EvalerFunc(FLess, TwoInts, TypeBool),
-		"<=":     EvalerFunc(FLessEq, TwoInts, TypeBool),
-		">":      EvalerFunc(FMore, TwoInts, TypeBool),
-		">=":     EvalerFunc(FMoreEq, TwoInts, TypeBool),
-		"=":      EvalerFunc(FEq, TwoArgs, TypeBool),
-		"not":    EvalerFunc(FNot, OneBoolArg, TypeBool),
-		"print":  EvalerFunc(i.FPrint, AnyArgs, TypeAny),
-		"head":   EvalerFunc(FHead, ListArg, TypeAny),
-		"tail":   EvalerFunc(FTail, ListArg, TypeList),
-		"append": EvalerFunc(FAppend, AppenderArgs, TypeList),
-		"list":   EvalerFunc(FList, AnyArgs, TypeList),
-		"space":  EvalerFunc(FSpace, StrArg, TypeBool),
-		"eol":    EvalerFunc(FEol, StrArg, TypeBool),
-		"empty":  EvalerFunc(FEmpty, ListArg, TypeBool),
-		"int":    EvalerFunc(i.FInt, StrArg, TypeInt),
-		"open":   EvalerFunc(FOpen, StrArg, TypeStr),
+		"+":      EvalerFunc("+", FPlus, AllInts, TypeInt),
+		"-":      EvalerFunc("-", FMinus, AllInts, TypeInt),
+		"*":      EvalerFunc("*", FMultiply, AllInts, TypeInt),
+		"/":      EvalerFunc("/", FDiv, AllInts, TypeInt),
+		"mod":    EvalerFunc("mod", FMod, TwoInts, TypeInt),
+		"<":      EvalerFunc("<", FLess, TwoInts, TypeBool),
+		"<=":     EvalerFunc("<=", FLessEq, TwoInts, TypeBool),
+		">":      EvalerFunc(">", FMore, TwoInts, TypeBool),
+		">=":     EvalerFunc(">=", FMoreEq, TwoInts, TypeBool),
+		"=":      EvalerFunc("=", FEq, TwoArgs, TypeBool),
+		"not":    EvalerFunc("not", FNot, OneBoolArg, TypeBool),
+		"print":  EvalerFunc("print", i.FPrint, AnyArgs, TypeAny),
+		"head":   EvalerFunc("head", FHead, ListArg, TypeAny),
+		"tail":   EvalerFunc("tail", FTail, ListArg, TypeList),
+		"append": EvalerFunc("append", FAppend, AppenderArgs, TypeList),
+		"list":   EvalerFunc("list", FList, AnyArgs, TypeList),
+		"space":  EvalerFunc("space", FSpace, StrArg, TypeBool),
+		"eol":    EvalerFunc("eol", FEol, StrArg, TypeBool),
+		"empty":  EvalerFunc("empty", FEmpty, ListArg, TypeBool),
+		"int":    EvalerFunc("int", i.FInt, StrArg, TypeInt),
+		"open":   EvalerFunc("open", FOpen, StrArg, TypeStr),
 	}
 	return i
 }
@@ -280,17 +280,20 @@ func (in *Interpret) Stat() {
 }
 
 func (i *Interpret) CheckReturnTypes() error {
+	mainArgs := map[string]Type{
+		"__stdin": TypeStr,
+	}
+	_, err := i.evalBodyType("__main__", i.mainBody, mainArgs)
+	if err != nil {
+		return err
+	}
 	for _, fn := range i.funcs {
 		fi, ok := fn.(*FuncInterpret)
 		if !ok {
 			// native function
 			continue
 		}
-		/*
-			if fi.returnType == TypeAny {
-				continue
-			}
-		*/
+
 		for _, impl := range fi.bodies {
 			t, err := i.evalBodyType(fi.name, impl.body, impl.argfmt.Values())
 			if err != nil {

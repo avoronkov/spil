@@ -13,6 +13,7 @@ type Evaler interface {
 }
 
 type nativeFunc struct {
+	name   string
 	fn     func([]Expr) (Expr, error)
 	ret    Type
 	binder func([]Expr) error
@@ -27,11 +28,16 @@ func (n *nativeFunc) ReturnType() Type {
 }
 
 func (n *nativeFunc) TryBind(args []Expr) error {
-	return n.binder(args)
+	err := n.binder(args)
+	if err != nil {
+		return fmt.Errorf("%v: %w", n.name, err)
+	}
+	return nil
 }
 
-func EvalerFunc(fn func([]Expr) (Expr, error), binder func([]Expr) error, ret Type) Evaler {
+func EvalerFunc(name string, fn func([]Expr) (Expr, error), binder func([]Expr) error, ret Type) Evaler {
 	return &nativeFunc{
+		name:   name,
 		fn:     fn,
 		ret:    ret,
 		binder: binder,

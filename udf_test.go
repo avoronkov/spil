@@ -41,5 +41,5 @@ func makeEmptyGen() List {
 	gen := func(args []Expr) (Expr, error) {
 		return QEmpty, nil
 	}
-	return NewLazyList(EvalerFunc(gen, AnyArgs, TypeAny), QEmpty, false)
+	return NewLazyList(EvalerFunc("__gen__", gen, AnyArgs, TypeAny), QEmpty, false)
 }
