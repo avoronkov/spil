@@ -93,7 +93,7 @@
 
 
 ;; lazy concat
-(def concat lists
+(def concat lists :list
 	 ; return one element at the time
 	 (set iter
 		  (lambda

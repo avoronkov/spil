@@ -219,7 +219,12 @@ func (i *Interpret) use(args []Expr) error {
 		defer f.Close()
 		return i.parse(f)
 	case Ident:
-		i.UseBigInt(true)
+		switch string(a) {
+		case "bigmath":
+			i.UseBigInt(true)
+		default:
+			return fmt.Errorf("Unknown use-directive: %v", string(a))
+		}
 		return nil
 	}
 	return fmt.Errorf("Unexpected argument type to 'use': %v (%T)", module, module)
@@ -288,7 +293,7 @@ func (i *Interpret) CheckReturnTypes() error {
 		fmt.Fprintf(os.Stderr, "CheckReturnTypes: %v\n", fi.name)
 		for _, impl := range fi.bodies {
 			if err := i.checkExprType(impl.body[len(impl.body)-1], fi.returnType); err != nil {
-				return fmt.Errorf("Incorrect return value in function %v: %v", fi.name, err)
+				return fmt.Errorf("Incorrect return value in function %v(%v): %v", fi.name, impl.argfmt, err)
 			}
 		}
 	}
@@ -303,7 +308,9 @@ func (i *Interpret) checkExprType(e Expr, rtype Type) error {
 	case Str:
 		act = TypeStr
 	case Bool:
-		act = TypeStr
+		act = TypeBool
+	case Ident:
+		// TODO
 	case *Sexpr:
 		if a.Quoted || a.Empty() {
 			act = TypeList

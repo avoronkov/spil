@@ -19,7 +19,7 @@ type FuncInterpret struct {
 }
 
 type FuncImpl struct {
-	argfmt Expr
+	argfmt *ArgFmt
 	body   []Expr
 	// Do we need to remenber function results?
 	memo bool
@@ -27,7 +27,7 @@ type FuncImpl struct {
 	results map[string]Expr
 }
 
-func NewFuncImpl(argfmt Expr, body []Expr, memo bool) *FuncImpl {
+func NewFuncImpl(argfmt *ArgFmt, body []Expr, memo bool) *FuncImpl {
 	i := &FuncImpl{
 		argfmt: argfmt,
 		body:   body,
@@ -60,22 +60,18 @@ func NewFuncInterpret(i *Interpret, name string) *FuncInterpret {
 
 func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr, memo bool, returnType Type) error {
 	if len(f.bodies) > 0 && returnType != f.returnType {
-		return fmt.Errorf("Cannot redefine return type: previous %v, current %v", f.returnType, returnType)
+		return fmt.Errorf("%v: cannot redefine return type: previous %v, current %v", f.name, f.returnType, returnType)
 	}
 	if argfmt == nil {
 		f.bodies = append(f.bodies, NewFuncImpl(nil, body, memo))
 		return nil
 	}
-	switch argfmt.(type) {
-	case Ident:
-		// pass arguments as list with specified name
-		f.bodies = append(f.bodies, NewFuncImpl(argfmt, body, memo))
-	case *Sexpr:
-		// bind arguments
-		f.bodies = append(f.bodies, NewFuncImpl(argfmt, body, memo))
-	default:
-		return fmt.Errorf("Expected arguments signature, found: %v", argfmt)
+	af, err := ParseArgFmt(argfmt)
+	if err != nil {
+		return err
 	}
+	f.bodies = append(f.bodies, NewFuncImpl(af, body, memo))
+
 	f.returnType = returnType
 	return nil
 }
@@ -150,17 +146,16 @@ func (f *FuncRuntime) bind(args []Expr) (impl *FuncImpl, result Expr, err error)
 		return
 	}
 	if impl.argfmt != nil {
-		switch a := impl.argfmt.(type) {
-		case Ident:
-			f.vars[string(a)] = &Sexpr{List: args, Quoted: true}
-		case *Sexpr:
-			if l := a.Len(); l != len(args) {
+		if impl.argfmt.Wildcard != "" {
+			f.vars[impl.argfmt.Wildcard] = &Sexpr{List: args, Quoted: true}
+		} else {
+			if l := len(impl.argfmt.Args); l != len(args) {
 				err = fmt.Errorf("Incorrect number of arguments to %v: expected %v, found %v", f.fi.name, l, len(args))
 				return
 			}
-			for i, ident := range a.List {
-				if iname, ok := ident.(Ident); ok {
-					f.vars[string(iname)] = args[i]
+			for i, arg := range impl.argfmt.Args {
+				if arg.V == nil {
+					f.vars[arg.Name] = args[i]
 				}
 			}
 		}
@@ -530,78 +525,105 @@ func (f *FuncRuntime) evalApply(se *Sexpr) (Expr, error) {
 	}, nil
 }
 
-func matchArgs(argfmt Expr, args []Expr) (result bool) {
+func matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {
+	/*
+		defer func() {
+			fmt.Fprintf(os.Stderr, "matchArgs(%v) over %v = %v\n", argfmt, nil, result)
+		}()
+	*/
+
 	if argfmt == nil {
 		// null matches everything (lambda case)
 		return true
 	}
 	binds := map[string]Expr{}
-	switch a := argfmt.(type) {
-	case *Sexpr:
-		if len(a.List) == 0 && len(args) == 0 {
-			return true
-		}
-		if len(a.List) != len(args) {
-			return false
-		}
-		for i, t := range a.List {
-			switch at := t.(type) {
-			case Int:
-				v, ok := args[i].(Int)
-				if !ok || !at.Eq(v) {
-					return false
-				}
-			case Str:
-				v, ok := args[i].(Str)
-				if !ok || at != v {
-					return false
-				}
-			case Bool:
-				v, ok := args[i].(Bool)
-				if !ok || at != v {
-					return false
-				}
-			case *Sexpr:
-				if at.Empty() {
-					// special case to match empty lazy list
-					if v, ok := args[i].(List); !ok || !v.Empty() {
-						return false
-					}
-				} else {
-					v, ok := args[i].(*Sexpr)
-					if !ok {
-						return false
-					}
-					h1, err := at.Hash()
-					if err != nil {
-						return false
-					}
-					h2, err := v.Hash()
-					if err != nil {
-						return false
-					}
-					if h1 != h2 {
-						return false
-					}
-				}
-			case Ident:
-				// check if param is already binded
-				if val, ok := binds[string(at)]; ok {
-					if val.String() != args[i].String() {
-						return false
-					}
-				}
-				binds[string(at)] = args[i]
-			default:
-				panic(fmt.Errorf("Unexpected expr: %v (%T)", t, t))
-			}
-		}
-		return true
-	case Ident:
-		// Ident matches everything
+	if argfmt.Wildcard != "" {
 		return true
 	}
-	panic(fmt.Errorf("Unexpected argument format type: %v (%T)", argfmt, argfmt))
+
+	if len(argfmt.Args) == 0 && len(args) == 0 {
+		return true
+	}
+
+	if len(argfmt.Args) != len(args) {
+		return false
+	}
+	for i, arg := range argfmt.Args {
+		switch arg.T {
+		case TypeInt:
+			fmt.Fprintf(os.Stderr, "Match TypeInt\n")
+			v, ok := args[i].(Int)
+			if !ok {
+				return false
+			}
+			if arg.V != nil && !arg.V.(Int).Eq(v) {
+				return false
+			}
+		case TypeStr:
+			fmt.Fprintf(os.Stderr, "Match TypeStr\n")
+			v, ok := args[i].(Str)
+			if !ok {
+				return false
+			}
+			if arg.V != nil && arg.V.(Str) != v {
+				return false
+			}
+		case TypeBool:
+			fmt.Fprintf(os.Stderr, "Match TypeBool\n")
+			v, ok := args[i].(Bool)
+			if !ok {
+				return false
+			}
+			if arg.V != nil && arg.V.(Bool) != v {
+				return false
+			}
+		case TypeList:
+			fmt.Fprintf(os.Stderr, "Match TypeList\n")
+			_, ok := args[i].(List)
+			if !ok {
+				return false
+			}
+			if arg.V == nil {
+				return true
+			}
+			at := arg.V.(*Sexpr)
+			if at.Empty() {
+				// special case to match empty lazy list
+				if v, ok := args[i].(List); !ok || !v.Empty() {
+					return false
+				}
+			} else {
+				v, ok := args[i].(*Sexpr)
+				if !ok {
+					return false
+				}
+				h1, err := at.Hash()
+				if err != nil {
+					return false
+				}
+				h2, err := v.Hash()
+				if err != nil {
+					return false
+				}
+				if h1 != h2 {
+					return false
+				}
+			}
+		case TypeAny:
+			// check if param is already binded
+			if val, ok := binds[arg.Name]; ok {
+				if val.String() != args[i].String() {
+					return false
+				}
+			}
+			binds[arg.Name] = args[i]
+		case TypeFunc:
+			panic(fmt.Errorf("Matching functions is not ready yet"))
+		default:
+			panic(fmt.Errorf("Unexpected artument type: %v (%T)", arg.T, arg.T))
+		}
+	}
+	return true
 }
 
 func (f *FuncRuntime) cleanup() {
