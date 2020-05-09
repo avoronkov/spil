@@ -387,6 +387,8 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 			return t, nil
 		} else if _, ok := i.funcs[string(a)]; ok {
 			return TypeFunc, nil
+		} else if t, ok := ParseType(string(a)); ok {
+			return t, nil
 		}
 		return 0, fmt.Errorf("Undefined variable: %v", string(a))
 	case *Sexpr:
@@ -458,6 +460,8 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 				return TypeAny, nil
 			}
 			return t1, nil
+		case "do":
+			return i.evalBodyType(fname, a.List[1:], vars)
 		default:
 			// this is a function call
 			f, ok := i.funcs[name]

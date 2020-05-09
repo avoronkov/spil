@@ -21,3 +21,5 @@
 
 (print "differ bool arg:" (fbool 'T 'F))
 (print "same bool arg:" (fbool 'T 'F))
+
+(def return-int () :int (do 13))

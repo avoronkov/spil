@@ -182,6 +182,12 @@ func (f *FuncRuntime) Eval(impl *FuncImpl) (res Expr, err error) {
 L:
 	for {
 		last := len(impl.body) - 1
+		if id, ok := impl.body[last].(Ident); ok {
+			if _, ok := ParseType(string(id)); ok {
+				// Last statement is type declaration
+				last--
+			}
+		}
 		for i, expr := range impl.body {
 			if i == last {
 				// check for tail call
@@ -299,17 +305,24 @@ func (f *FuncRuntime) lastExpr(e Expr) (Expr, error) {
 				return f.lastExpr(a.List[3])
 			}
 			if name == "do" {
-				if len(a.List) < 2 {
+				last := len(a.List) - 1
+				if id, ok := a.List[last].(Ident); ok {
+					if _, ok := ParseType(string(id)); ok {
+						// Last statement is type declaration
+						last--
+					}
+				}
+				if last == 0 {
 					return nil, fmt.Errorf("do: empty body")
 				}
-				if len(a.List) > 2 {
-					for _, st := range a.List[1 : len(a.List)-1] {
+				if last > 1 {
+					for _, st := range a.List[1:last] {
 						if _, err := f.evalExpr(st); err != nil {
 							return nil, err
 						}
 					}
 				}
-				return f.lastExpr(a.List[len(a.List)-1])
+				return f.lastExpr(a.List[last])
 			}
 			if name == "and" {
 				for _, arg := range a.List[1:] {
