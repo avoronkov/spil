@@ -134,7 +134,7 @@ func (f *FuncRuntime) bind(args []Expr) (impl *FuncImpl, result Expr, err error)
 	f.cleanup()
 	argfmtFound := false
 	for idx, im := range f.fi.bodies {
-		if matchArgs(im.argfmt, args) {
+		if f.fi.matchArgs(im.argfmt, args) {
 			impl = f.fi.bodies[idx]
 			argfmtFound = true
 			if im.memo {
@@ -545,7 +545,7 @@ func (f *FuncRuntime) evalApply(se *Sexpr) (Expr, error) {
 	}, nil
 }
 
-func matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {
+func (f *FuncInterpret) matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {
 	if argfmt == nil {
 		// null matches everything (lambda case)
 		return true
@@ -562,6 +562,7 @@ func matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {
 	if len(argfmt.Args) != len(args) {
 		return false
 	}
+ARGS:
 	for i, arg := range argfmt.Args {
 		if args[i] == Everything {
 			// TODO write warning in strict mode?
@@ -619,7 +620,7 @@ func matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {
 				return false
 			}
 			if arg.V == nil {
-				return true
+				continue ARGS
 			}
 			at := arg.V.(*Sexpr)
 			if at.Empty() {
@@ -644,6 +645,17 @@ func matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {
 					return false
 				}
 			}
+		case TypeFunc:
+			id, ok := args[i].(Ident)
+			if !ok {
+				fmt.Fprintf(os.Stderr, "Expecting function, found: %v\n", args[i])
+				return false
+			}
+			if _, ok := f.interpret.funcs[string(id)]; ok {
+				continue ARGS
+			}
+			fmt.Fprintf(os.Stderr, "Function not found: %v\n", args[i])
+			return false
 		case TypeAny, TypeUnknown:
 			// check if param is already binded
 			if val, ok := binds[arg.Name]; ok {
@@ -652,8 +664,6 @@ func matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {
 				}
 			}
 			binds[arg.Name] = args[i]
-		case TypeFunc:
-			panic(fmt.Errorf("Matching functions is not ready yet"))
 		default:
 			panic(fmt.Errorf("Unexpected artument type: %v (%T)", arg.T, arg.T))
 		}

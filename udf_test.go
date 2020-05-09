@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"strconv"
 	"testing"
 )
@@ -27,9 +28,13 @@ func TestMatchArgs(t *testing.T) {
 		{MakeArgFmt(Arg{T: TypeInt, V: Int64(1)}), []Expr{Str("Hello")}, false},
 		{MakeArgFmt(Arg{T: TypeList, V: QEmpty}), []Expr{makeEmptyGen()}, true},
 	}
+	in := NewInterpreter(os.Stderr, "")
+	fname := string(in.fakeArg(TypeFunc).(Ident))
+	in.funcs[fname] = EvalerFunc("__fake__", in.fakeFunc, AnyArgs, TypeAny)
+	fi := NewFuncInterpret(in, "__test__")
 	for i, test := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			act := matchArgs(test.argfmt, test.args)
+			act := fi.matchArgs(test.argfmt, test.args)
 			if act != test.exp {
 				t.Errorf("Incorrect matchArgs(%v, %v) != %v", test.argfmt, test.args, test.exp)
 			}

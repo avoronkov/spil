@@ -159,7 +159,15 @@ func (i *Interpret) Parse(input io.Reader) error {
 
 // type-checking
 func (i *Interpret) Check() error {
+	fname := string(i.fakeArg(TypeFunc).(Ident))
+	fi := NewFuncInterpret(i, "__fake__")
+	i.funcs[fname] = fi
+	defer func() {
+		delete(i.funcs, fname)
+	}()
+
 	return i.CheckReturnTypes()
+
 }
 
 func (i *Interpret) Run() error {
@@ -239,6 +247,10 @@ func (in *Interpret) FPrint(args []Expr) (Expr, error) {
 	}
 	fmt.Fprintf(in.output, "\n")
 	return QEmpty, nil
+}
+
+func (in *Interpret) fakeFunc(args []Expr) (Expr, error) {
+	panic("The fakeFunc should not be called")
 }
 
 // convert string into int
@@ -464,6 +476,12 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 			return i.evalBodyType(fname, a.List[1:], vars)
 		default:
 			// this is a function call
+			if tvar, ok := vars[name]; ok {
+				if tvar == TypeFunc || tvar == TypeUnknown {
+					return TypeUnknown, nil
+				}
+				return 0, fmt.Errorf("%v: expected '%v' to be function, found: %v", fname, name, tvar)
+			}
 			f, ok := i.funcs[name]
 			if !ok {
 				fmt.Fprintf(os.Stderr, "%v: cannot detect return type of function %v\n", fname, name)

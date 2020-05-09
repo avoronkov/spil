@@ -23,3 +23,13 @@
 (print "same bool arg:" (fbool 'T 'F))
 
 (def return-int () :int (do 13))
+
+(func xmap (fn:func l:list) :list (xmap fn l '()))
+(func xmap (fn:func '() acc:list) :list acc)
+(func xmap (fn:func l:list acc:list) :list
+	  (xmap fn (tail l) (append acc (fn (head l)))))
+
+
+(def x2 (n) (* n 2))
+(print "xmap(func):" (xmap x2 '(1 2 3 5 8)))
+(print "xmap(lambda):" (xmap \(+ _1 10) '(1 2 3 5 8)))
