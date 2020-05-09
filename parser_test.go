@@ -24,6 +24,7 @@ func TestNextToken(t *testing.T) {
 		{`(print "hello \"world\"" )`, []string{"(", "print", `"hello \"world\""`, ")"}},
 		{"(hello)\ntrue\n#vim ft=lisp", []string{"(", "hello", ")", "true"}},
 		{`\(foo bar)`, []string{`\(`, "foo", "bar", ")"}},
+		{`"(set n (get-int) :int)"`, []string{`"(set n (get-int) :int)"`}},
 	}
 
 	for _, test := range testdata {
