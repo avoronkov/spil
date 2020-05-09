@@ -29,8 +29,6 @@ func TestMatchArgs(t *testing.T) {
 		{MakeArgFmt(Arg{T: TypeList, V: QEmpty}), []Expr{makeEmptyGen()}, true},
 	}
 	in := NewInterpreter(os.Stderr, "")
-	fname := string(in.fakeArg(TypeFunc).(Ident))
-	in.funcs[fname] = EvalerFunc("__fake__", in.fakeFunc, AnyArgs, TypeAny)
 	fi := NewFuncInterpret(in, "__test__")
 	for i, test := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {

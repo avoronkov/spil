@@ -9,14 +9,14 @@ import (
 type Evaler interface {
 	Eval([]Expr) (Expr, error)
 	ReturnType() Type
-	TryBind(args []Expr) error
+	TryBind(params []Parameter) (int, error)
 }
 
 type nativeFunc struct {
 	name   string
 	fn     func([]Expr) (Expr, error)
 	ret    Type
-	binder func([]Expr) error
+	binder func([]Parameter) error
 }
 
 func (n *nativeFunc) Eval(args []Expr) (Expr, error) {
@@ -27,15 +27,14 @@ func (n *nativeFunc) ReturnType() Type {
 	return n.ret
 }
 
-func (n *nativeFunc) TryBind(args []Expr) error {
-	err := n.binder(args)
-	if err != nil {
-		return fmt.Errorf("%v: %w", n.name, err)
+func (n *nativeFunc) TryBind(params []Parameter) (int, error) {
+	if err := n.binder(params); err != nil {
+		return -1, fmt.Errorf("%v: %v", n.name, err)
 	}
-	return nil
+	return 0, nil
 }
 
-func EvalerFunc(name string, fn func([]Expr) (Expr, error), binder func([]Expr) error, ret Type) Evaler {
+func EvalerFunc(name string, fn func([]Expr) (Expr, error), binder func([]Parameter) error, ret Type) Evaler {
 	return &nativeFunc{
 		name:   name,
 		fn:     fn,
@@ -362,84 +361,78 @@ func FOpen(args []Expr) (Expr, error) {
 }
 
 // Binders
-func AllInts(args []Expr) error {
-	for i, arg := range args {
-		if arg == Everything {
+func AllInts(params []Parameter) error {
+	for i, p := range params {
+		if p.T == TypeUnknown {
 			continue
 		}
-		if _, ok := arg.(Int); !ok {
-			return fmt.Errorf("Expected all integer arguments, found%v at position %v", arg, i)
+		if p.T != TypeInt {
+			return fmt.Errorf("Expected all integer arguments, found%v at position %v", p, i)
 		}
 	}
 	return nil
 }
 
-func TwoInts(args []Expr) error {
-	if len(args) != 2 {
-		return fmt.Errorf("expected 2 arguments, found %v", args)
+func TwoInts(params []Parameter) error {
+	if len(params) != 2 {
+		return fmt.Errorf("expected 2 arguments, found %v", params)
 	}
-	_, ok := args[0].(Int)
-	if !ok && args[0] != Everything {
-		return fmt.Errorf("first argument should be integer, found %v", args[0])
+	if params[0].T != TypeInt && params[0].T != TypeUnknown {
+		return fmt.Errorf("first argument should be integer, found %v", params[0])
 	}
-	_, ok = args[1].(Int)
-	if !ok && args[1] != Everything {
-		return fmt.Errorf("second argument should be integer, found %v", args[1])
+	if params[1].T != TypeInt && params[1].T != TypeUnknown {
+		return fmt.Errorf("second argument should be integer, found %v", params[1])
 	}
 	return nil
 }
 
-func TwoArgs(args []Expr) error {
-	if len(args) != 2 {
-		return fmt.Errorf("expected 2 arguments, found %v", args)
+func TwoArgs(params []Parameter) error {
+	if len(params) != 2 {
+		return fmt.Errorf("expected 2 arguments, found %v", params)
 	}
 	return nil
 }
 
-func OneBoolArg(args []Expr) error {
-	if len(args) != 1 {
-		return fmt.Errorf("expected 1 argument, found %v", args)
+func OneBoolArg(params []Parameter) error {
+	if len(params) != 1 {
+		return fmt.Errorf("expected 1 argument, found %v", params)
 	}
-	_, ok := args[0].(Bool)
-	if !ok && args[0] != Everything {
-		return fmt.Errorf("expected argument to be Bool, found %v", args[0])
-	}
-	return nil
-}
-
-func AnyArgs(args []Expr) error {
-	return nil
-}
-
-func ListArg(args []Expr) error {
-	if len(args) != 1 {
-		return fmt.Errorf("expected 1 argument, found %v", args)
-	}
-	_, ok := args[0].(List)
-	if !ok && args[0] != Everything {
-		return fmt.Errorf("expected argument to be List, found %v", args[0])
+	if params[0].T != TypeBool && params[0].T != TypeUnknown {
+		return fmt.Errorf("expected argument to be Bool, found %v", params[0])
 	}
 	return nil
 }
 
-func AppenderArgs(args []Expr) error {
-	if len(args) <= 1 {
+func AnyArgs(params []Parameter) error {
+	return nil
+}
+
+func ListArg(params []Parameter) error {
+	if len(params) != 1 {
+		return fmt.Errorf("expected 1 argument, found %v", params)
+	}
+	if params[0].T != TypeList && params[0].T != TypeStr && params[0].T != TypeUnknown {
+		return fmt.Errorf("expected argument to be List, found %v", params[0])
+	}
+	return nil
+}
+
+func AppenderArgs(params []Parameter) error {
+	if len(params) <= 1 {
 		return nil
 	}
-	_, ok := args[0].(Appender)
-	if !ok && args[0] != Everything {
-		return fmt.Errorf("FAppend: expected first argument to be Appender, found %v", args[0])
+	if params[0].T != TypeList && params[0].T != TypeStr && params[0].T != TypeUnknown {
+		return fmt.Errorf("FAppend: expected first argument to be Appender, found %v", params[0])
 	}
 	return nil
 }
 
-func StrArg(args []Expr) error {
-	if len(args) != 1 {
-		return fmt.Errorf("expected exaclty one argument, found %v", args)
+func StrArg(params []Parameter) error {
+	if len(params) != 1 {
+		return fmt.Errorf("expected exaclty one argument, found %v", params)
 	}
-	_, ok := args[0].(Str)
-	if !ok && args[0] != Everything {
-		return fmt.Errorf("expected argument to be Str, found %v", args)
+	if params[0].T != TypeStr && params[0].T != TypeUnknown {
+		return fmt.Errorf("expected argument to be Str, found %v", params)
 	}
 	return nil
 }

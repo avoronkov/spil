@@ -159,13 +159,6 @@ func (i *Interpret) Parse(input io.Reader) error {
 
 // type-checking
 func (i *Interpret) Check() error {
-	fname := string(i.fakeArg(TypeFunc).(Ident))
-	fi := NewFuncInterpret(i, "__fake__")
-	i.funcs[fname] = fi
-	defer func() {
-		delete(i.funcs, fname)
-	}()
-
 	return i.CheckReturnTypes()
 
 }
@@ -489,34 +482,38 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 			}
 
 			// check if we have matching func impl
-			args := []Expr{}
+			params := []Parameter{}
 			for _, item := range a.List[1:] {
 				switch a := item.(type) {
-				case Int, Str, Bool:
-					args = append(args, a)
+				case Int:
+					params = append(params, Parameter{T: TypeInt, V: item})
+				case Str:
+					params = append(params, Parameter{T: TypeStr, V: item})
+				case Bool:
+					params = append(params, Parameter{T: TypeBool, V: item})
 				case *Sexpr:
 					if a.Empty() || a.Quoted {
-						args = append(args, a)
+						params = append(params, Parameter{T: TypeList, V: a})
 					} else if a.Lambda {
-						args = append(args, i.fakeArg(TypeFunc))
+						params = append(params, Parameter{T: TypeFunc})
 					} else {
 						itemType, err := i.exprType(fname, item, vars)
 						if err != nil {
 							return 0, err
 						}
-						args = append(args, i.fakeArg(itemType))
+						params = append(params, Parameter{T: itemType})
 					}
 				case Ident:
 					itemType, err := i.exprType(fname, item, vars)
 					if err != nil {
 						return 0, err
 					}
-					args = append(args, i.fakeArg(itemType))
+					params = append(params, Parameter{T: itemType})
 				default:
 					panic(fmt.Errorf("%v: unexpected type: %v", fname, item))
 				}
 			}
-			err := f.TryBind(args)
+			_, err := f.TryBind(params)
 			if err != nil {
 				return 0, fmt.Errorf("%v: %v", fname, err)
 			}
@@ -526,26 +523,4 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 	}
 	fmt.Fprintf(os.Stderr, "Unexpected return. (TypeAny)\n")
 	return TypeAny, nil
-}
-
-func (i *Interpret) fakeArg(t Type) Expr {
-	switch t {
-	case TypeInt:
-		v, _ := i.parseInt("-1339")
-		return v
-	case TypeStr:
-		return Str("asdfasdlakdfa'adfask$%@")
-	case TypeBool:
-		return Bool(false)
-	case TypeList:
-		return QList(QEmpty, Int64(-1339))
-	case TypeFunc:
-		return Ident("__fake_function_name_adfaf12312f")
-	case TypeAny:
-		return Ident("__any_object_1299")
-	case TypeUnknown:
-		return Everything
-	default:
-		panic(fmt.Errorf("Unexpected Type: %v", t))
-	}
 }

@@ -77,10 +77,13 @@ func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr, memo bool, returnType 
 	return nil
 }
 
-func (f *FuncInterpret) TryBind(args []Expr) error {
-	run := NewFuncRuntime(f)
-	_, _, err := run.bind(args)
-	return err
+func (f *FuncInterpret) TryBind(params []Parameter) (int, error) {
+	for idx, im := range f.bodies {
+		if f.matchParameters(im.argfmt, params) {
+			return idx, nil
+		}
+	}
+	return -1, fmt.Errorf("%v: no matching function implementaion found for %v", f.name, params)
 }
 
 func (f *FuncInterpret) Eval(args []Expr) (Expr, error) {
@@ -182,6 +185,9 @@ func (f *FuncRuntime) Eval(impl *FuncImpl) (res Expr, err error) {
 L:
 	for {
 		last := len(impl.body) - 1
+		if last < 0 {
+			break L
+		}
 		if id, ok := impl.body[last].(Ident); ok {
 			if _, ok := ParseType(string(id)); ok {
 				// Last statement is type declaration
@@ -543,6 +549,80 @@ func (f *FuncRuntime) evalApply(se *Sexpr) (Expr, error) {
 	return &Sexpr{
 		List: cmd,
 	}, nil
+}
+
+func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []Parameter) bool {
+	if argfmt == nil {
+		// null matches everything (lambda case)
+		return true
+	}
+	if argfmt.Wildcard != "" {
+		return true
+	}
+
+	binds := map[string]Expr{}
+	if len(argfmt.Args) != len(params) {
+		return false
+	}
+	for i, arg := range argfmt.Args {
+		param := params[i]
+		if arg.T == TypeUnknown || param.T == TypeUnknown {
+			// TODO write warning in strict mode?
+			continue
+		}
+		if arg.T == TypeAny {
+			continue
+		}
+		if arg.T != param.T {
+			// Type mismatch
+			return false
+		}
+		if arg.V == nil {
+			// anything this corresponding type matches
+			continue
+		}
+		if param.V == nil {
+			// not a real parameter, just a Type binder
+			continue
+		}
+		switch arg.T {
+		case TypeInt, TypeStr, TypeBool:
+			if arg.V != param.V {
+			}
+			if binded, ok := binds[arg.Name]; ok {
+				if binded.String() != param.V.String() {
+					return false
+				}
+			} else if arg.V != param.V {
+				return false
+			}
+		case TypeFunc:
+			// This is OK
+		case TypeList:
+			at := arg.V.(*Sexpr)
+			if at.Empty() {
+				if v, ok := param.V.(List); !ok || !v.Empty() {
+					return false
+				}
+			} else {
+				h1, err := at.Hash()
+				if err != nil {
+					return false
+				}
+				h2, err := param.V.Hash()
+				if err != nil {
+					return false
+				}
+				if h1 != h2 {
+					return false
+				}
+			}
+		default:
+			panic(fmt.Errorf("Unexpected type: %v", arg.T))
+		}
+		binds[arg.Name] = param.V
+	}
+	return true
 }
 
 func (f *FuncInterpret) matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {

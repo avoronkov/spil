@@ -134,3 +134,8 @@ func ParseArgFmt(argfmt Expr) (*ArgFmt, error) {
 	}
 
 }
+
+type Parameter struct {
+	T Type
+	V Expr
+}
