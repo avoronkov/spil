@@ -139,3 +139,26 @@ type Parameter struct {
 	T Type
 	V Expr
 }
+
+func MakeParametersFromArgs(args []Expr) (res []Parameter) {
+	for _, arg := range args {
+		p := Parameter{V: arg}
+		switch arg.(type) {
+		case Int:
+			p.T = TypeInt
+		case Str:
+			p.T = TypeStr
+		case Bool:
+			p.T = TypeBool
+		case List:
+			p.T = TypeList
+		case Ident:
+			// TODO maybe check that function exist
+			p.T = TypeFunc
+		default:
+			panic(fmt.Errorf("Unexpected Expr type: %v (%v)", arg, arg))
+		}
+		res = append(res, p)
+	}
+	return
+}

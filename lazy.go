@@ -31,7 +31,6 @@ func NewLazyList(iter Evaler, state Expr, hashable bool) *LazyList {
 	return l
 }
 
-// String() should evaluate the whole list
 func (l *LazyList) String() string {
 	if l.Empty() {
 		return "{Lazy: }"
@@ -148,4 +147,8 @@ func (l *LazyList) Empty() bool {
 		l.state = state
 	}
 	return l.value == nil
+}
+
+func (l *LazyList) Type() Type {
+	return TypeList
 }

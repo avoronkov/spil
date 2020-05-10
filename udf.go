@@ -135,26 +135,21 @@ func keyOfArgs(args []Expr) (string, error) {
 
 func (f *FuncRuntime) bind(args []Expr) (impl *FuncImpl, result Expr, err error) {
 	f.cleanup()
-	argfmtFound := false
-	for idx, im := range f.fi.bodies {
-		if f.fi.matchArgs(im.argfmt, args) {
-			impl = f.fi.bodies[idx]
-			argfmtFound = true
-			if im.memo {
-				keyArgs, err := keyOfArgs(args)
-				if err != nil {
-					log.Printf("Cannot compute hash of args: %v, %v", args, err)
-				} else if res, ok := im.results[keyArgs]; ok {
-					return nil, res, nil
-				}
-			}
-			break
+	params := MakeParametersFromArgs(args)
+	idx, err := f.fi.TryBind(params)
+	if err != nil {
+		return nil, nil, err
+	}
+	impl = f.fi.bodies[idx]
+	if impl.memo {
+		keyArgs, err := keyOfArgs(args)
+		if err != nil {
+			log.Printf("Cannot compute hash of args: %v, %v", args, err)
+		} else if res, ok := impl.results[keyArgs]; ok {
+			return nil, res, nil
 		}
 	}
-	if !argfmtFound {
-		err = fmt.Errorf("No matching function implementation found: %v (%v)", f.fi.name, args)
-		return
-	}
+
 	if impl.argfmt != nil {
 		if impl.argfmt.Wildcard != "" {
 			f.vars[impl.argfmt.Wildcard] = &Sexpr{List: args, Quoted: true}
@@ -551,7 +546,7 @@ func (f *FuncRuntime) evalApply(se *Sexpr) (Expr, error) {
 	}, nil
 }
 
-func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []Parameter) bool {
+func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []Parameter) (result bool) {
 	if argfmt == nil {
 		// null matches everything (lambda case)
 		return true
@@ -566,63 +561,44 @@ func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []Parameter) bool
 	}
 	for i, arg := range argfmt.Args {
 		param := params[i]
-		if arg.T == TypeUnknown || param.T == TypeUnknown {
-			// TODO write warning in strict mode?
-			continue
-		}
-		if arg.T == TypeAny {
-			continue
-		}
-		if arg.T != param.T {
-			// Type mismatch
+		if !f.matchParam(&arg, &param) {
 			return false
 		}
-		if arg.V == nil {
-			// anything this corresponding type matches
+		if arg.Name == "" {
 			continue
 		}
 		if param.V == nil {
-			// not a real parameter, just a Type binder
 			continue
 		}
-		switch arg.T {
-		case TypeInt, TypeStr, TypeBool:
-			if arg.V != param.V {
-			}
-			if binded, ok := binds[arg.Name]; ok {
-				if binded.String() != param.V.String() {
-					return false
-				}
-			} else if arg.V != param.V {
+		if binded, ok := binds[arg.Name]; ok {
+			if !Equal(binded, param.V) {
 				return false
 			}
-		case TypeFunc:
-			// This is OK
-		case TypeList:
-			at := arg.V.(*Sexpr)
-			if at.Empty() {
-				if v, ok := param.V.(List); !ok || !v.Empty() {
-					return false
-				}
-			} else {
-				h1, err := at.Hash()
-				if err != nil {
-					return false
-				}
-				h2, err := param.V.Hash()
-				if err != nil {
-					return false
-				}
-				if h1 != h2 {
-					return false
-				}
-			}
-		default:
-			panic(fmt.Errorf("Unexpected type: %v", arg.T))
 		}
 		binds[arg.Name] = param.V
 	}
 	return true
+}
+
+func (f *FuncInterpret) matchParam(a *Arg, p *Parameter) bool {
+	if a.T == TypeUnknown || p.T == TypeUnknown {
+		return true
+	}
+	if a.T == TypeAny {
+		return true
+	}
+	if a.T != p.T {
+		return false
+	}
+	if p.V == nil {
+		// not a real parameter, just a Type binder
+		return true
+	}
+	if a.V == nil {
+		// anything of this corresponding type matches
+		return true
+	}
+	return Equal(a.V, p.V)
 }
 
 func (f *FuncInterpret) matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {
@@ -644,10 +620,12 @@ func (f *FuncInterpret) matchArgs(argfmt *ArgFmt, args []Expr) (result bool) {
 	}
 ARGS:
 	for i, arg := range argfmt.Args {
-		if args[i] == Everything {
-			// TODO write warning in strict mode?
-			continue
-		}
+		/*
+			if args[i] == Everything {
+				// TODO write warning in strict mode?
+				continue
+			}
+		*/
 		switch arg.T {
 		case TypeInt:
 			v, ok := args[i].(Int)

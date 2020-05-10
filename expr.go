@@ -12,6 +12,7 @@ type Expr interface {
 	// Write yourself into writer
 	Print(io.Writer)
 	Hash() (string, error)
+	Type() Type
 }
 
 type List interface {
@@ -80,6 +81,10 @@ func (s Str) Append(args []Expr) (Expr, error) {
 	return Str(result), nil
 }
 
+func (s Str) Type() Type {
+	return TypeStr
+}
+
 type Ident string
 
 var _ Expr = Ident("")
@@ -94,6 +99,10 @@ func (i Ident) Hash() (string, error) {
 
 func (i Ident) Print(w io.Writer) {
 	io.WriteString(w, "_"+string(i))
+}
+
+func (i Ident) Type() Type {
+	return TypeAny
 }
 
 type Bool bool
@@ -118,6 +127,10 @@ func (i Bool) Print(w io.Writer) {
 	} else {
 		io.WriteString(w, "false")
 	}
+}
+
+func (i Bool) Type() Type {
+	return TypeBool
 }
 
 var _ List = (*Sexpr)(nil)
@@ -217,18 +230,23 @@ func (s *Sexpr) Append(args []Expr) (Expr, error) {
 	}, nil
 }
 
-type everything struct{}
-
-var Everything Expr = everything{}
-
-func (e everything) Hash() (string, error) {
-	return "", fmt.Errorf("Everything cannot be hashed")
+func (s *Sexpr) Type() Type {
+	return TypeList
 }
 
-func (e everything) Print(w io.Writer) {
-	fmt.Fprintf(w, "Everything cannot be printed")
-}
-
-func (e everything) String() string {
-	return "{Everything}"
+func Equal(a, b Expr) bool {
+	al, alist := a.(List)
+	bl, blist := b.(List)
+	if alist && blist && al.Empty() && bl.Empty() {
+		return true
+	}
+	if a.Type() != b.Type() {
+		return false
+	}
+	ha, aerr := a.Hash()
+	hb, berr := b.Hash()
+	if aerr != nil || berr != nil {
+		return false
+	}
+	return ha == hb
 }

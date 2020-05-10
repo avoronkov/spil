@@ -105,3 +105,7 @@ func (i *LazyInput) Close() error {
 	}
 	return nil
 }
+
+func (i *LazyInput) Type() Type {
+	return TypeStr
+}
