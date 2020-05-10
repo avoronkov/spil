@@ -9,30 +9,90 @@ import (
 func TestMatchArgs(t *testing.T) {
 	tests := []struct {
 		argfmt *ArgFmt
-		args   []Expr
+		args   []Parameter
 		exp    bool
 	}{
-		{MakeArgFmt(), []Expr{}, true},
-		{MakeArgFmt(Arg{T: TypeList, V: QEmpty}), []Expr{QEmpty}, true},
-		{MakeArgFmt(Arg{T: TypeList, V: QEmpty}), []Expr{QList(Int64(1))}, false},
-		{MakeArgFmt(Arg{Name: "x", T: TypeAny}, Arg{T: TypeList, V: QEmpty}), []Expr{QList(Int64(1)), QEmpty}, true},
-		{MakeArgFmt(Arg{Name: "x", T: TypeStr}, Arg{T: TypeList, V: QEmpty}), []Expr{QList(Int64(1)), QEmpty}, false},
-		{MakeWildcard("args"), []Expr{QList(Int64(1)), QEmpty}, true},
-		{MakeArgFmt(Arg{Name: "x", T: TypeAny}, Arg{T: TypeList, V: QEmpty}), []Expr{QList(Int64(1)), QEmpty}, true},
-		{MakeArgFmt(Arg{Name: "x", T: TypeBool}, Arg{T: TypeList, V: QEmpty}), []Expr{QList(Int64(1)), QEmpty}, false},
-		{MakeArgFmt(Arg{Name: "x", T: TypeAny}, Arg{Name: "x", T: TypeAny}), []Expr{Int64(1), Int64(1)}, true},
-		{MakeArgFmt(Arg{Name: "x", T: TypeAny}, Arg{Name: "x", T: TypeAny}), []Expr{Int64(1), Int64(2)}, false},
-		{MakeArgFmt(Arg{Name: "x", T: TypeStr}, Arg{Name: "x", T: TypeStr}), []Expr{Int64(1), Int64(1)}, false},
-		{MakeArgFmt(Arg{Name: "x", T: TypeStr}, Arg{T: TypeInt, V: Int64(1)}), []Expr{Int64(1), Int64(1)}, false},
-		{MakeArgFmt(Arg{Name: "x", T: TypeStr}, Arg{T: TypeInt, V: Int64(1)}), []Expr{Int64(1), Int64(2)}, false},
-		{MakeArgFmt(Arg{T: TypeInt, V: Int64(1)}), []Expr{Str("Hello")}, false},
-		{MakeArgFmt(Arg{T: TypeList, V: QEmpty}), []Expr{makeEmptyGen()}, true},
+		{
+			MakeArgFmt(),
+			MakeParametersFromArgs([]Expr{}),
+			true,
+		},
+		{
+			MakeArgFmt(Arg{T: TypeList, V: QEmpty}),
+			MakeParametersFromArgs([]Expr{QEmpty}),
+			true,
+		},
+		{
+			MakeArgFmt(Arg{T: TypeList, V: QEmpty}),
+			MakeParametersFromArgs([]Expr{QList(Int64(1))}),
+			false,
+		},
+		{
+			MakeArgFmt(Arg{Name: "x", T: TypeAny}, Arg{T: TypeList, V: QEmpty}),
+			MakeParametersFromArgs([]Expr{QList(Int64(1)), QEmpty}),
+			true,
+		},
+		{
+			MakeArgFmt(Arg{Name: "x", T: TypeStr}, Arg{T: TypeList, V: QEmpty}),
+			MakeParametersFromArgs([]Expr{QList(Int64(1)), QEmpty}),
+			false,
+		},
+		{
+			MakeWildcard("args"),
+			MakeParametersFromArgs([]Expr{QList(Int64(1)), QEmpty}),
+			true,
+		},
+		{
+			MakeArgFmt(Arg{Name: "x", T: TypeAny}, Arg{T: TypeList, V: QEmpty}),
+			MakeParametersFromArgs([]Expr{QList(Int64(1)), QEmpty}),
+			true,
+		},
+		{
+			MakeArgFmt(Arg{Name: "x", T: TypeBool}, Arg{T: TypeList, V: QEmpty}),
+			MakeParametersFromArgs([]Expr{QList(Int64(1)), QEmpty}),
+			false,
+		},
+		{
+			MakeArgFmt(Arg{Name: "x", T: TypeAny}, Arg{Name: "x", T: TypeAny}),
+			MakeParametersFromArgs([]Expr{Int64(1), Int64(1)}),
+			true,
+		},
+		{
+			MakeArgFmt(Arg{Name: "x", T: TypeAny}, Arg{Name: "x", T: TypeAny}),
+			MakeParametersFromArgs([]Expr{Int64(1), Int64(2)}),
+			false,
+		},
+		{
+			MakeArgFmt(Arg{Name: "x", T: TypeStr}, Arg{Name: "x", T: TypeStr}),
+			MakeParametersFromArgs([]Expr{Int64(1), Int64(1)}),
+			false,
+		},
+		{
+			MakeArgFmt(Arg{Name: "x", T: TypeStr}, Arg{T: TypeInt, V: Int64(1)}),
+			MakeParametersFromArgs([]Expr{Int64(1), Int64(1)}),
+			false,
+		},
+		{
+			MakeArgFmt(Arg{Name: "x", T: TypeStr}, Arg{T: TypeInt, V: Int64(1)}),
+			MakeParametersFromArgs([]Expr{Int64(1), Int64(2)}),
+			false,
+		},
+		{
+			MakeArgFmt(Arg{T: TypeInt, V: Int64(1)}),
+			MakeParametersFromArgs([]Expr{Str("Hello")}),
+			false,
+		},
+		{
+			MakeArgFmt(Arg{T: TypeList, V: QEmpty}),
+			MakeParametersFromArgs([]Expr{makeEmptyGen()}),
+			true,
+		},
 	}
 	in := NewInterpreter(os.Stderr, "")
 	fi := NewFuncInterpret(in, "__test__")
 	for i, test := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			act := fi.matchArgs(test.argfmt, test.args)
+			act := fi.matchParameters(test.argfmt, test.args)
 			if act != test.exp {
 				t.Errorf("Incorrect matchArgs(%v, %v) != %v", test.argfmt, test.args, test.exp)
 			}
