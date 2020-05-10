@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
 )
 
 type LazyInput struct {
@@ -25,7 +24,6 @@ func NewLazyInput(f io.ReadCloser) *LazyInput {
 }
 
 func (i *LazyInput) Head() (*Param, error) {
-	log.Printf("Input.Head()")
 	if err := i.next(); err != nil {
 		return nil, err
 	}
@@ -36,7 +34,6 @@ func (i *LazyInput) Head() (*Param, error) {
 }
 
 func (i *LazyInput) Tail() (List, error) {
-	log.Printf("Input.Tail()")
 	if err := i.next(); err != nil {
 		return nil, err
 	}
@@ -52,9 +49,6 @@ func (i *LazyInput) Tail() (List, error) {
 }
 
 func (i *LazyInput) Empty() (result bool) {
-	defer func() {
-		log.Printf("Input.Empty(): %v", result)
-	}()
 	if err := i.next(); err != nil {
 		panic(err)
 	}
@@ -99,7 +93,6 @@ func (i *LazyInput) Hash() (string, error) {
 }
 
 func (i *LazyInput) Close() error {
-	log.Printf("Closing file")
 	if i.file != nil {
 		return i.file.Close()
 	}

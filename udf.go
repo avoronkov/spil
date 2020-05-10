@@ -495,7 +495,6 @@ func (f *FuncRuntime) setVar(se *Sexpr, scoped bool) error {
 		return err
 	}
 	if se.Len() == 3 {
-		log.Printf("%v: setVar type = %v", f.fi.name, se.List[2])
 		id, ok := se.List[2].(Ident)
 		if !ok {
 			return fmt.Errorf("%v: set expects type identifier, found: %v", f.fi.name, se.List[2])
@@ -504,7 +503,6 @@ func (f *FuncRuntime) setVar(se *Sexpr, scoped bool) error {
 		if err != nil {
 			return err
 		}
-		log.Printf("%v: setVar type = %v", f.fi.name, t)
 		value.T = t
 	}
 	f.vars[string(name)] = *value
