@@ -86,8 +86,7 @@ func (f *FuncInterpret) TryBind(params []Param) (int, error) {
 	return -1, fmt.Errorf("%v: no matching function implementaion found for %v", f.name, params)
 }
 
-func (f *FuncInterpret) Eval(params []Param) (*Param, error) {
-	fmt.Fprintf(os.Stderr, "%v: Eval (%v)\n", f.name, params)
+func (f *FuncInterpret) Eval(params []Param) (result *Param, err error) {
 	run := NewFuncRuntime(f)
 	impl, result, err := run.bind(params)
 	if err != nil {
@@ -194,21 +193,29 @@ L:
 		if last < 0 {
 			break L
 		}
+		var bodyForceType *Type
 		if id, ok := impl.body[last].(Ident); ok {
-			if _, ok := ParseType(string(id)); ok {
+			if tp, ok := ParseType(string(id)); ok {
 				// Last statement is type declaration
 				last--
+				bodyForceType = &tp
 			}
 		}
 		for i, expr := range impl.body {
 			if i == last {
 				// check for tail call
-				e, _, err := f.lastParameter(expr)
+				e, forceType, err := f.lastParameter(expr)
 				if err != nil {
 					return nil, err
 				}
 				lst, ok := e.V.(*Sexpr)
 				if !ok {
+					if forceType != nil {
+						e.T = *forceType
+					}
+					if bodyForceType != nil {
+						e.T = *bodyForceType
+					}
 					if memoImpl.memo {
 						// lets remenber the result
 						memoImpl.RememberResult(f.fi.name, memoArgs, e)
@@ -218,6 +225,12 @@ L:
 				}
 				if lst.Quoted || lst.Len() == 0 {
 					p := &Param{V: lst, T: TypeList}
+					if forceType != nil {
+						p.T = *forceType
+					}
+					if bodyForceType != nil {
+						p.T = *bodyForceType
+					}
 					if memoImpl.memo {
 						// lets remenber the result
 						memoImpl.RememberResult(f.fi.name, memoArgs, p)
@@ -230,6 +243,12 @@ L:
 					result, err := f.evalFunc(lst)
 					if err != nil {
 						return nil, err
+					}
+					if forceType != nil {
+						result.T = *forceType
+					}
+					if bodyForceType != nil {
+						result.T = *bodyForceType
 					}
 					if memoImpl.memo {
 						// lets remenber the result
@@ -318,11 +337,11 @@ func (f *FuncRuntime) lastParameter(e Expr) (*Param, *Type, error) {
 					return nil, nil, fmt.Errorf("Expected 3 arguments to if, found: %v", a.List[1:])
 				}
 				arg := a.List[1]
-				res, err := f.evalExpr(arg)
+				res, err := f.evalParameter(arg)
 				if err != nil {
 					return nil, nil, err
 				}
-				boolRes, ok := res.(Bool)
+				boolRes, ok := res.V.(Bool)
 				if !ok {
 					return nil, nil, fmt.Errorf("Argument %v should evaluate to boolean value, actual %v", arg, res)
 				}
@@ -332,7 +351,6 @@ func (f *FuncRuntime) lastParameter(e Expr) (*Param, *Type, error) {
 				return f.lastParameter(a.List[3])
 			}
 			if name == "do" {
-				// fmt.Fprintf(os.Stderr, "DO\n")
 				var retType *Type
 				last := len(a.List) - 1
 				if id, ok := a.List[last].(Ident); ok {
@@ -342,13 +360,12 @@ func (f *FuncRuntime) lastParameter(e Expr) (*Param, *Type, error) {
 						retType = &rt
 					}
 				}
-				// fmt.Fprintf(os.Stderr, "DO: retType = %v\n", retType)
 				if last == 0 {
 					return nil, nil, fmt.Errorf("do: empty body")
 				}
 				if last > 1 {
 					for _, st := range a.List[1:last] {
-						if _, err := f.evalExpr(st); err != nil {
+						if _, err := f.evalParameter(st); err != nil {
 							return nil, nil, err
 						}
 					}
@@ -362,16 +379,15 @@ func (f *FuncRuntime) lastParameter(e Expr) (*Param, *Type, error) {
 					ret.T = *retType
 					ft = retType
 				}
-				// fmt.Fprintf(os.Stderr, "DO return %v\n", ret)
 				return ret, ft, nil
 			}
 			if name == "and" {
 				for _, arg := range a.List[1:] {
-					res, err := f.evalExpr(arg)
+					res, err := f.evalParameter(arg)
 					if err != nil {
 						return nil, nil, err
 					}
-					boolRes, ok := res.(Bool)
+					boolRes, ok := res.V.(Bool)
 					if !ok {
 						return nil, nil, fmt.Errorf("and: rrgument %v should evaluate to boolean value, actual %v", arg, res)
 					}
@@ -389,11 +405,11 @@ func (f *FuncRuntime) lastParameter(e Expr) (*Param, *Type, error) {
 			}
 			if name == "or" {
 				for _, arg := range a.List[1:] {
-					res, err := f.evalExpr(arg)
+					res, err := f.evalParameter(arg)
 					if err != nil {
 						return nil, nil, err
 					}
-					boolRes, ok := res.(Bool)
+					boolRes, ok := res.V.(Bool)
 					if !ok {
 						return nil, nil, fmt.Errorf("and: rrgument %v should evaluate to boolean value, actual %v", arg, res)
 					}
@@ -442,138 +458,12 @@ func (f *FuncRuntime) lastParameter(e Expr) (*Param, *Type, error) {
 	panic(fmt.Errorf("%v: Unexpected Expr type: %v (%T)", f.fi.name, e, e))
 }
 
-func (f *FuncRuntime) lastExpr(e Expr) (Expr, error) {
-	switch a := e.(type) {
-	case Int:
-		return a, nil
-	case Str:
-		return a, nil
-	case Bool:
-		return a, nil
-	case Ident:
-		if value, ok := f.vars[string(a)]; ok {
-			return value.V, nil
-		}
-		return a, nil
-	case *Sexpr:
-		if a.Quoted {
-			return a, nil
-		}
-		if a.Len() == 0 {
-			return nil, fmt.Errorf("%v: Unexpected empty s-expression: %v", f.fi.name, a)
-		}
-		head, _ := a.Head()
-		if name, ok := head.V.(Ident); ok {
-			if a.Lambda {
-				return f.evalLambda(&Sexpr{List: []Expr{a}, Quoted: true})
-			}
-			if name == "lambda" {
-				tail, _ := a.Tail()
-				return f.evalLambda(tail.(*Sexpr))
-			}
-			if name == "if" {
-				// (cond) (expr-if-true) (expr-if-false)
-				if len(a.List) != 4 {
-					return nil, fmt.Errorf("Expected 3 arguments to if, found: %v", a.List[1:])
-				}
-				arg := a.List[1]
-				res, err := f.evalExpr(arg)
-				if err != nil {
-					return nil, err
-				}
-				boolRes, ok := res.(Bool)
-				if !ok {
-					return nil, fmt.Errorf("Argument %v should evaluate to boolean value, actual %v", arg, res)
-				}
-				if bool(boolRes) {
-					return f.lastExpr(a.List[2])
-				}
-				return f.lastExpr(a.List[3])
-			}
-			if name == "do" {
-				last := len(a.List) - 1
-				if id, ok := a.List[last].(Ident); ok {
-					if _, ok := ParseType(string(id)); ok {
-						// Last statement is type declaration
-						last--
-					}
-				}
-				if last == 0 {
-					return nil, fmt.Errorf("do: empty body")
-				}
-				if last > 1 {
-					for _, st := range a.List[1:last] {
-						if _, err := f.evalExpr(st); err != nil {
-							return nil, err
-						}
-					}
-				}
-				return f.lastExpr(a.List[last])
-			}
-			if name == "and" {
-				for _, arg := range a.List[1:] {
-					res, err := f.evalExpr(arg)
-					if err != nil {
-						return nil, err
-					}
-					boolRes, ok := res.(Bool)
-					if !ok {
-						return nil, fmt.Errorf("and: rrgument %v should evaluate to boolean value, actual %v", arg, res)
-					}
-					if !bool(boolRes) {
-						return Bool(false), nil
-					}
-				}
-				return Bool(true), nil
-			}
-			if name == "or" {
-				for _, arg := range a.List[1:] {
-					res, err := f.evalExpr(arg)
-					if err != nil {
-						return nil, err
-					}
-					boolRes, ok := res.(Bool)
-					if !ok {
-						return nil, fmt.Errorf("and: rrgument %v should evaluate to boolean value, actual %v", arg, res)
-					}
-					if bool(boolRes) {
-						return Bool(true), nil
-					}
-				}
-				return Bool(false), nil
-			}
-			if name == "set" || name == "set'" {
-				tail, _ := a.Tail()
-				if err := f.setVar(tail.(*Sexpr) /*scoped*/, name == "set'"); err != nil {
-					return nil, err
-				}
-				return QEmpty, nil
-			}
-			if name == "gen" || name == "gen'" {
-				tail, _ := a.Tail()
-				return f.evalGen(tail.(*Sexpr) /*hashable*/, name == "gen'")
-			}
-			if name == "apply" {
-				tail, _ := a.Tail()
-				return f.evalApply(tail.(*Sexpr))
-			}
-		}
-
-		// return unevaluated list
-		return a, nil
-	case *LazyList:
-		return a, nil
-	}
-	panic(fmt.Errorf("%v: Unexpected Expr type: %v (%T)", f.fi.name, e, e))
-}
-
 func (f *FuncRuntime) evalParameter(expr Expr) (p *Param, err error) {
 	var forceType *Type
 	defer func() {
 		if p != nil && forceType != nil {
 			p.T = *forceType
 		}
-		// fmt.Fprintf(os.Stderr, "%v: evalParameter(%v) = %v, %v\n", f.fi.name, expr, p, err)
 	}()
 	e, ft, err := f.lastParameter(expr)
 	forceType = ft
@@ -586,30 +476,9 @@ func (f *FuncRuntime) evalParameter(expr Expr) (p *Param, err error) {
 		return e, nil
 	}
 	if lst.Quoted || lst.Len() == 0 {
-		p := &Param{V: lst, T: TypeList}
-		return p, nil
-	}
-	return f.evalFunc(lst)
-}
-
-func (f *FuncRuntime) evalExpr(expr Expr) (Expr, error) {
-	e, err := f.lastExpr(expr)
-	if err != nil {
-		return nil, err
-	}
-	lst, ok := e.(*Sexpr)
-	if !ok {
-		// nothing to evaluate
 		return e, nil
 	}
-	if lst.Quoted || lst.Len() == 0 {
-		return lst, nil
-	}
-	res, err := f.evalFunc(lst)
-	if err != nil {
-		return nil, err
-	}
-	return res.V, err
+	return f.evalFunc(lst)
 }
 
 // (var-name) (value)
@@ -637,11 +506,11 @@ func (f *FuncRuntime) evalGen(se *Sexpr, hashable bool) (Expr, error) {
 	if se.Len() != 2 {
 		return nil, fmt.Errorf("gen wants 2 argument, found %v", se)
 	}
-	fn, err := f.evalExpr(se.List[0])
+	fn, err := f.evalParameter(se.List[0])
 	if err != nil {
 		return nil, err
 	}
-	fident, ok := fn.(Ident)
+	fident, ok := fn.V.(Ident)
 	if !ok {
 		return nil, fmt.Errorf("gen expects first argument to be a funtion, found: %v", se.List[0])
 	}
@@ -743,11 +612,11 @@ func (f *FuncRuntime) evalApply(se *Sexpr) (Expr, error) {
 	if len(se.List) != 2 {
 		return nil, fmt.Errorf("apply expects function with list of arguments")
 	}
-	res, err := f.evalExpr(se.List[1])
+	res, err := f.evalParameter(se.List[1])
 	if err != nil {
 		return nil, err
 	}
-	args, ok := res.(List)
+	args, ok := res.V.(List)
 	if !ok {
 		return nil, fmt.Errorf("apply expects result to be a list of argument")
 	}
@@ -764,9 +633,6 @@ func (f *FuncRuntime) evalApply(se *Sexpr) (Expr, error) {
 }
 
 func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []Param) (result bool) {
-	defer func() {
-		// fmt.Fprintf(os.Stderr, "%v: match (%v, %v) = %v\n", f.name, argfmt, params, result)
-	}()
 	if argfmt == nil {
 		// null matches everything (lambda case)
 		return true
@@ -801,9 +667,6 @@ func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []Param) (result 
 }
 
 func (f *FuncInterpret) matchParam(a *Arg, p *Param) bool {
-	defer func() {
-		// fmt.Fprintf(os.Stderr, "%v: match (%v, %v) = %v\n", f.name, argfmt, params, result)
-	}()
 	if a.T == TypeUnknown && a.V == nil {
 		return true
 	}

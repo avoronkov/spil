@@ -51,6 +51,7 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 		"empty":  EvalerFunc("empty", FEmpty, ListArg, TypeBool),
 		"int":    EvalerFunc("int", i.FInt, StrArg, TypeInt),
 		"open":   EvalerFunc("open", FOpen, StrArg, TypeStr),
+		"type":   EvalerFunc("type", FType, SingleArg, TypeStr),
 	}
 	i.types = map[Type]Type{
 		TypeUnknown: "",

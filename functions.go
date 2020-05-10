@@ -370,7 +370,21 @@ func FOpen(args []Param) (*Param, error) {
 	return &Param{V: NewLazyInput(file), T: TypeStr}, nil
 }
 
+func FType(args []Param) (*Param, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf(": expected exaclty one argument, found %v", args)
+	}
+	return &Param{V: Str(args[0].T), T: TypeStr}, nil
+}
+
 // Binders
+func SingleArg(params []Param) error {
+	if len(params) != 1 {
+		return fmt.Errorf("FOpen: expected exaclty one argument, found %v", params)
+	}
+	return nil
+}
+
 func AllInts(params []Param) error {
 	for i, p := range params {
 		if p.T == TypeUnknown {

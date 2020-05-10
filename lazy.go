@@ -94,7 +94,6 @@ func (l *LazyList) Head() (*Param, error) {
 }
 
 func (l *LazyList) next() (value *Param, state *Param, err error) {
-	// fmt.Fprintf(os.Stderr, "next: %v\n", l.state)
 	args := []Param{*l.state}
 	returnType := l.iter.ReturnType()
 	expr, err := l.iter.Eval(args)
