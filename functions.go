@@ -385,29 +385,27 @@ func SingleArg(params []Param) error {
 	return nil
 }
 
-func AllInts(params []Param) error {
+func (in *Interpret) AllInts(params []Param) error {
 	for i, p := range params {
 		if p.T == TypeUnknown {
 			continue
 		}
-		if p.T != TypeInt {
-			return fmt.Errorf("Expected all integer arguments, found%v at position %v", p, i)
+		ok, err := in.canConvertType(p.T, TypeInt)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return fmt.Errorf("Expected all integer arguments, found %v at position %v", p, i)
 		}
 	}
 	return nil
 }
 
-func TwoInts(params []Param) error {
+func (in *Interpret) TwoInts(params []Param) error {
 	if len(params) != 2 {
 		return fmt.Errorf("expected 2 arguments, found %v", params)
 	}
-	if params[0].T != TypeInt && params[0].T != TypeUnknown {
-		return fmt.Errorf("first argument should be integer, found %v", params[0])
-	}
-	if params[1].T != TypeInt && params[1].T != TypeUnknown {
-		return fmt.Errorf("second argument should be integer, found %v", params[1])
-	}
-	return nil
+	return in.AllInts(params)
 }
 
 func TwoArgs(params []Param) error {
@@ -417,11 +415,15 @@ func TwoArgs(params []Param) error {
 	return nil
 }
 
-func OneBoolArg(params []Param) error {
+func (in *Interpret) OneBoolArg(params []Param) error {
 	if len(params) != 1 {
 		return fmt.Errorf("expected 1 argument, found %v", params)
 	}
-	if params[0].T != TypeBool && params[0].T != TypeUnknown {
+	ok, err := in.canConvertType(params[0].T, TypeBool)
+	if err != nil {
+		return err
+	}
+	if !ok && params[0].T != TypeUnknown {
 		return fmt.Errorf("expected argument to be Bool, found %v", params[0])
 	}
 	return nil
@@ -431,31 +433,58 @@ func AnyArgs(params []Param) error {
 	return nil
 }
 
-func ListArg(params []Param) error {
+func (in *Interpret) ListArg(params []Param) error {
 	if len(params) != 1 {
 		return fmt.Errorf("expected 1 argument, found %v", params)
 	}
+
+	ok, err := in.canConvertType(params[0].T, TypeList)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return nil
+	}
+
 	if params[0].T != TypeList && params[0].T != TypeStr && params[0].T != TypeUnknown {
 		return fmt.Errorf("expected argument to be List, found %v", params[0])
 	}
 	return nil
 }
 
-func AppenderArgs(params []Param) error {
+func (in *Interpret) AppenderArgs(params []Param) error {
 	if len(params) <= 1 {
 		return nil
 	}
-	if params[0].T != TypeList && params[0].T != TypeStr && params[0].T != TypeUnknown {
+	ok, err := in.canConvertType(params[0].T, TypeList)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return nil
+	}
+	ok, err = in.canConvertType(params[0].T, TypeStr)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return nil
+	}
+	if params[0].T != TypeUnknown {
 		return fmt.Errorf("FAppend: expected first argument to be Appender, found %v", params[0])
 	}
 	return nil
 }
 
-func StrArg(params []Param) error {
+func (in *Interpret) StrArg(params []Param) error {
 	if len(params) != 1 {
 		return fmt.Errorf("expected exaclty one argument, found %v", params)
 	}
-	if params[0].T != TypeStr && params[0].T != TypeUnknown {
+	ok, err := in.canConvertType(params[0].T, TypeStr)
+	if err != nil {
+		return err
+	}
+	if !ok && params[0].T != TypeUnknown {
 		return fmt.Errorf("expected argument to be Str, found %v", params)
 	}
 	return nil

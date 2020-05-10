@@ -30,27 +30,27 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 		parseInt:   ParseInt64,
 	}
 	i.funcs = map[string]Evaler{
-		"+":      EvalerFunc("+", FPlus, AllInts, TypeInt),
-		"-":      EvalerFunc("-", FMinus, AllInts, TypeInt),
-		"*":      EvalerFunc("*", FMultiply, AllInts, TypeInt),
-		"/":      EvalerFunc("/", FDiv, AllInts, TypeInt),
-		"mod":    EvalerFunc("mod", FMod, TwoInts, TypeInt),
-		"<":      EvalerFunc("<", FLess, TwoInts, TypeBool),
-		"<=":     EvalerFunc("<=", FLessEq, TwoInts, TypeBool),
-		">":      EvalerFunc(">", FMore, TwoInts, TypeBool),
-		">=":     EvalerFunc(">=", FMoreEq, TwoInts, TypeBool),
+		"+":      EvalerFunc("+", FPlus, i.AllInts, TypeInt),
+		"-":      EvalerFunc("-", FMinus, i.AllInts, TypeInt),
+		"*":      EvalerFunc("*", FMultiply, i.AllInts, TypeInt),
+		"/":      EvalerFunc("/", FDiv, i.AllInts, TypeInt),
+		"mod":    EvalerFunc("mod", FMod, i.TwoInts, TypeInt),
+		"<":      EvalerFunc("<", FLess, i.TwoInts, TypeBool),
+		"<=":     EvalerFunc("<=", FLessEq, i.TwoInts, TypeBool),
+		">":      EvalerFunc(">", FMore, i.TwoInts, TypeBool),
+		">=":     EvalerFunc(">=", FMoreEq, i.TwoInts, TypeBool),
 		"=":      EvalerFunc("=", FEq, TwoArgs, TypeBool),
-		"not":    EvalerFunc("not", FNot, OneBoolArg, TypeBool),
+		"not":    EvalerFunc("not", FNot, i.OneBoolArg, TypeBool),
 		"print":  EvalerFunc("print", i.FPrint, AnyArgs, TypeAny),
-		"head":   EvalerFunc("head", FHead, ListArg, TypeAny),
-		"tail":   EvalerFunc("tail", FTail, ListArg, TypeList),
-		"append": EvalerFunc("append", FAppend, AppenderArgs, TypeList),
+		"head":   EvalerFunc("head", FHead, i.ListArg, TypeAny),
+		"tail":   EvalerFunc("tail", FTail, i.ListArg, TypeList),
+		"append": EvalerFunc("append", FAppend, i.AppenderArgs, TypeList),
 		"list":   EvalerFunc("list", FList, AnyArgs, TypeList),
-		"space":  EvalerFunc("space", FSpace, StrArg, TypeBool),
-		"eol":    EvalerFunc("eol", FEol, StrArg, TypeBool),
-		"empty":  EvalerFunc("empty", FEmpty, ListArg, TypeBool),
-		"int":    EvalerFunc("int", i.FInt, StrArg, TypeInt),
-		"open":   EvalerFunc("open", FOpen, StrArg, TypeStr),
+		"space":  EvalerFunc("space", FSpace, i.StrArg, TypeBool),
+		"eol":    EvalerFunc("eol", FEol, i.StrArg, TypeBool),
+		"empty":  EvalerFunc("empty", FEmpty, i.ListArg, TypeBool),
+		"int":    EvalerFunc("int", i.FInt, i.StrArg, TypeInt),
+		"open":   EvalerFunc("open", FOpen, i.StrArg, TypeStr),
 		"type":   EvalerFunc("type", FType, SingleArg, TypeStr),
 	}
 	i.types = map[Type]Type{
@@ -216,6 +216,9 @@ func (i *Interpret) defineFunc(se *Sexpr, memo bool) error {
 	if identType, ok := se.List[2].(Ident); ok {
 		returnType, ok = ParseType(string(identType))
 		if ok {
+			if _, err := i.parseType(string(identType)); err != nil {
+				return fmt.Errorf("%v: %v", fname, err)
+			}
 			bodyIndex++
 		}
 	}
@@ -284,6 +287,9 @@ func (in *Interpret) defineType(args []Expr) error {
 func (in *Interpret) canConvertType(from, to Type) (bool, error) {
 	if _, ok := in.types[to]; !ok {
 		return false, fmt.Errorf("Type %v is not defined", to)
+	}
+	if from == to {
+		return true, nil
 	}
 	for {
 		parent, ok := in.types[from]
@@ -419,9 +425,9 @@ L:
 					if !ok {
 						return u, fmt.Errorf("Fourth statement of %v should be type identifier, found: %v", name, a.List[3])
 					}
-					tp, ok := ParseType(string(id))
-					if !ok {
-						return u, fmt.Errorf("Fourth statement of %v should be type identifier, found: %v", name, a.List[3])
+					tp, err := in.parseType(string(id))
+					if err != nil {
+						return u, fmt.Errorf("Fourth statement of %v should be type identifier, found: %v (%v)", name, a.List[3], err)
 					}
 					vars[string(varname)] = tp
 				} else if len(a.List) == 3 {
@@ -464,12 +470,13 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 	case Bool:
 		return TypeBool, nil
 	case Ident:
+		// fmt.Fprintf(os.Stderr, "exprType: %v\n", a)
 		if t, ok := vars[string(a)]; ok {
 			return t, nil
 		} else if _, ok := i.funcs[string(a)]; ok {
 			return TypeFunc, nil
-		} else if t, ok := ParseType(string(a)); ok {
-			return t, nil
+		} else if _, err := i.parseType(string(a)); err == nil {
+			return Type(a), nil
 		}
 		return u, fmt.Errorf("Undefined variable: %v", string(a))
 	case *Sexpr:
@@ -599,4 +606,12 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 	}
 	fmt.Fprintf(os.Stderr, "Unexpected return. (TypeAny)\n")
 	return TypeAny, nil
+}
+
+func (in *Interpret) parseType(token string) (Type, error) {
+	_, ok := in.types[Type(token)]
+	if !ok {
+		return "", fmt.Errorf("type %v is not defined", token)
+	}
+	return Type(token), nil
 }

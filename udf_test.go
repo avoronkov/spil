@@ -102,9 +102,15 @@ func TestMatchArgs(t *testing.T) {
 			[]Param{Param{T: TypeAny, V: Int64(1)}},
 			true,
 		},
+		{
+			MakeArgFmt(Arg{Name: "n", T: TypeList}),
+			[]Param{Param{T: Type(":set"), V: QEmpty}},
+			true,
+		},
 	}
 	in := NewInterpreter(os.Stderr, "")
 	fi := NewFuncInterpret(in, "__test__")
+	in.types[Type(":set")] = TypeList
 	for i, test := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			act := fi.matchParameters(test.argfmt, test.args)
@@ -120,4 +126,12 @@ func makeEmptyGen() List {
 		return &Param{V: QEmpty, T: TypeList}, nil
 	}
 	return NewLazyList(EvalerFunc("__gen__", gen, AnyArgs, TypeAny), &Param{V: QEmpty, T: TypeList}, false)
+}
+
+func TestCanConvertType(t *testing.T) {
+	in := NewInterpreter(os.Stderr, "")
+	ok, err := in.canConvertType(Type(":int"), Type(":any"))
+	if err != nil || !ok {
+		t.Errorf("Cannot convert :int into :any (%v)", err)
+	}
 }

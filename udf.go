@@ -494,6 +494,19 @@ func (f *FuncRuntime) setVar(se *Sexpr, scoped bool) error {
 	if err != nil {
 		return err
 	}
+	if se.Len() == 3 {
+		log.Printf("%v: setVar type = %v", f.fi.name, se.List[2])
+		id, ok := se.List[2].(Ident)
+		if !ok {
+			return fmt.Errorf("%v: set expects type identifier, found: %v", f.fi.name, se.List[2])
+		}
+		t, err := f.fi.interpret.parseType(string(id))
+		if err != nil {
+			return err
+		}
+		log.Printf("%v: setVar type = %v", f.fi.name, t)
+		value.T = t
+	}
 	f.vars[string(name)] = *value
 	if scoped {
 		f.scopedVars = append(f.scopedVars, string(name))
@@ -677,7 +690,14 @@ func (f *FuncInterpret) matchParam(a *Arg, p *Param) bool {
 		return true
 	}
 	if a.T != p.T && p.T != TypeUnknown && p.T != TypeAny {
-		return false
+		canConvert, err := f.interpret.canConvertType(p.T, a.T)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v: %v\n", f.name, err)
+			return false
+		}
+		if !canConvert && p.T != TypeUnknown {
+			return false
+		}
 	}
 	if p.V == nil {
 		// not a real parameter, just a Type binder

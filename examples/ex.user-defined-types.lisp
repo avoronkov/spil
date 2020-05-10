@@ -8,6 +8,8 @@
 (def concat' (l:list r:list) :list
 	 (concat' (append l (head r)) (tail r)))
 
+(deftype :set :list)
+
 (def set-new () :set '() :set)
 
 (def set-add (s:set e:any) :set (set-add '() (do s :list) e))
@@ -25,6 +27,19 @@
 (set s3 (set-add s2 2))
 (set s4 (set-add s3 3))
 
+(def my-head (l:list) :any (head l))
 
-(print (head (do s1 :list)))
+(print (head s1))
 (print "set:" s4)
+
+(deftype :positive :int)
+(set xp (do 13 :positive))
+
+(print (type xp))
+(print (+ xp 12))
+(print (mod xp 5))
+
+(deftype :mystring :str)
+(set ms (do " " :mystring))
+(print (space ms))
+(print (append ms "OK"))
