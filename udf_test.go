@@ -9,7 +9,7 @@ import (
 func TestMatchArgs(t *testing.T) {
 	tests := []struct {
 		argfmt *ArgFmt
-		args   []Parameter
+		args   []Param
 		exp    bool
 	}{
 		{
@@ -87,6 +87,21 @@ func TestMatchArgs(t *testing.T) {
 			MakeParametersFromArgs([]Expr{makeEmptyGen()}),
 			true,
 		},
+		{
+			MakeArgFmt(Arg{T: TypeInt, V: Int64(13)}),
+			[]Param{Param{T: TypeUnknown, V: Int64(13)}},
+			true,
+		},
+		{
+			MakeArgFmt(Arg{Name: "n", T: TypeInt, V: Int64(15)}),
+			[]Param{Param{T: TypeUnknown, V: Int64(439)}},
+			false,
+		},
+		{
+			MakeArgFmt(Arg{Name: "n", T: TypeInt, V: Int64(1)}),
+			[]Param{Param{T: TypeAny, V: Int64(1)}},
+			true,
+		},
 	}
 	in := NewInterpreter(os.Stderr, "")
 	fi := NewFuncInterpret(in, "__test__")
@@ -101,8 +116,8 @@ func TestMatchArgs(t *testing.T) {
 }
 
 func makeEmptyGen() List {
-	gen := func(args []Expr) (Expr, error) {
-		return QEmpty, nil
+	gen := func(args []Param) (*Param, error) {
+		return &Param{V: QEmpty, T: TypeList}, nil
 	}
-	return NewLazyList(EvalerFunc("__gen__", gen, AnyArgs, TypeAny), QEmpty, false)
+	return NewLazyList(EvalerFunc("__gen__", gen, AnyArgs, TypeAny), &Param{V: QEmpty, T: TypeList}, false)
 }

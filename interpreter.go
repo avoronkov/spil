@@ -11,6 +11,7 @@ import (
 type Interpret struct {
 	output   io.Writer
 	funcs    map[string]Evaler
+	types    map[Type]Type
 	mainBody []Expr
 
 	builtinDir string
@@ -50,6 +51,15 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 		"empty":  EvalerFunc("empty", FEmpty, ListArg, TypeBool),
 		"int":    EvalerFunc("int", i.FInt, StrArg, TypeInt),
 		"open":   EvalerFunc("open", FOpen, StrArg, TypeStr),
+	}
+	i.types = map[Type]Type{
+		TypeUnknown: "",
+		TypeAny:     "",
+		TypeInt:     TypeAny,
+		TypeStr:     TypeAny,
+		TypeBool:    TypeAny,
+		TypeFunc:    TypeAny,
+		TypeList:    TypeAny,
 	}
 	return i
 }
@@ -113,7 +123,7 @@ L:
 				return fmt.Errorf("Unexpected empty s-expression on top-level: %v", a)
 			}
 			head, _ := a.Head()
-			if name, ok := head.(Ident); ok {
+			if name, ok := head.V.(Ident); ok {
 				switch name {
 				case "func", "def", "func'", "def'":
 					memo := false
@@ -128,6 +138,12 @@ L:
 				case "use":
 					tail, _ := a.Tail()
 					if err := i.use(tail.(*Sexpr).List); err != nil {
+						return err
+					}
+					continue L
+				case "deftype":
+					tail, _ := a.Tail()
+					if err := i.defineType(tail.(*Sexpr).List); err != nil {
 						return err
 					}
 					continue L
@@ -165,7 +181,7 @@ func (i *Interpret) Check() error {
 
 func (i *Interpret) Run() error {
 	stdin := NewLazyInput(os.Stdin)
-	_, err := i.main.Eval([]Expr{stdin})
+	_, err := i.main.Eval([]Param{Param{V: stdin, T: TypeStr}})
 	return err
 }
 
@@ -231,15 +247,68 @@ func (i *Interpret) use(args []Expr) error {
 	return fmt.Errorf("Unexpected argument type to 'use': %v (%T)", module, module)
 }
 
-func (in *Interpret) FPrint(args []Expr) (Expr, error) {
+// (new-type) (old-type)
+func (in *Interpret) defineType(args []Expr) error {
+	if len(args) != 2 {
+		return fmt.Errorf("'deftype' expected two arguments, found: %v", args)
+	}
+	newId, ok := args[0].(Ident)
+	if !ok {
+		return fmt.Errorf("deftype expects first argument to be new type, found: %v", args[0])
+	}
+	newType, ok := ParseType(string(newId))
+	if !ok {
+		return fmt.Errorf("deftype expects first argument to be new type, found: %v", args[0])
+	}
+
+	if _, ok := in.types[newType]; ok {
+		return fmt.Errorf("Cannot redefine type %v", newType)
+	}
+
+	oldId, ok := args[1].(Ident)
+	if !ok {
+		return fmt.Errorf("deftype expects first argument to be new type, found: %v", args[1])
+	}
+	oldType, ok := ParseType(string(oldId))
+	if !ok {
+		return fmt.Errorf("deftype expects first argument to be new type, found: %v", args[0])
+	}
+	if _, ok := in.types[oldType]; !ok {
+		return fmt.Errorf("Basic type does not exist: %v", oldType)
+	}
+	in.types[newType] = oldType
+	return nil
+}
+
+func (in *Interpret) canConvertType(from, to Type) (bool, error) {
+	if _, ok := in.types[to]; !ok {
+		return false, fmt.Errorf("Type %v is not defined", to)
+	}
+	for {
+		parent, ok := in.types[from]
+		if !ok {
+			return false, fmt.Errorf("Type %v is not defined", from)
+		}
+		if parent == to {
+			return true, nil
+		}
+		if parent == "" {
+			return false, nil
+		}
+		from = parent
+	}
+	panic("Unreachable return")
+}
+
+func (in *Interpret) FPrint(args []Param) (*Param, error) {
 	for i, e := range args {
 		if i > 0 {
 			fmt.Fprintf(in.output, " ")
 		}
-		e.Print(in.output)
+		e.V.Print(in.output)
 	}
 	fmt.Fprintf(in.output, "\n")
-	return QEmpty, nil
+	return &Param{V: QEmpty, T: TypeList}, nil
 }
 
 func (in *Interpret) fakeFunc(args []Expr) (Expr, error) {
@@ -247,11 +316,11 @@ func (in *Interpret) fakeFunc(args []Expr) (Expr, error) {
 }
 
 // convert string into int
-func (in *Interpret) FInt(args []Expr) (Expr, error) {
+func (in *Interpret) FInt(args []Param) (*Param, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("FInt: expected exaclty one argument, found %v", args)
 	}
-	s, ok := args[0].(Str)
+	s, ok := args[0].V.(Str)
 	if !ok {
 		return nil, fmt.Errorf("FInt: expected argument to be Str, found %v", args)
 	}
@@ -259,7 +328,7 @@ func (in *Interpret) FInt(args []Expr) (Expr, error) {
 	if !ok {
 		return nil, fmt.Errorf("FInt: cannot convert argument into Int: %v", s)
 	}
-	return i, nil
+	return &Param{V: i, T: TypeInt}, nil
 }
 
 func (in *Interpret) NewLambdaName() (name string) {
@@ -320,6 +389,7 @@ func (in *Interpret) evalBodyType(fname string, body []Expr, vars map[string]Typ
 		return TypeAny, err
 	}
 
+	u := TypeUnknown
 L:
 	for i, stt := range body[:len(body)-1] {
 		_ = i
@@ -332,46 +402,46 @@ L:
 			}
 			ident, ok := a.List[0].(Ident)
 			if !ok {
-				return 0, fmt.Errorf("Expected ident, found: %v", a.List[0])
+				return u, fmt.Errorf("Expected ident, found: %v", a.List[0])
 			}
 			switch name := string(ident); name {
 			case "set", "set'":
 				if i == len(body)-1 {
-					return 0, fmt.Errorf("Unexpected %v statement at the end of the function", name)
+					return u, fmt.Errorf("Unexpected %v statement at the end of the function", name)
 				}
 				varname, ok := a.List[1].(Ident)
 				if !ok {
-					return 0, fmt.Errorf("%v: second argument should be variable name, found: %v", name, a.List[1])
+					return u, fmt.Errorf("%v: second argument should be variable name, found: %v", name, a.List[1])
 				}
 				if len(a.List) == 4 {
 					id, ok := a.List[3].(Ident)
 					if !ok {
-						return 0, fmt.Errorf("Fourth statement of %v should be type identifier, found: %v", name, a.List[3])
+						return u, fmt.Errorf("Fourth statement of %v should be type identifier, found: %v", name, a.List[3])
 					}
 					tp, ok := ParseType(string(id))
 					if !ok {
-						return 0, fmt.Errorf("Fourth statement of %v should be type identifier, found: %v", name, a.List[3])
+						return u, fmt.Errorf("Fourth statement of %v should be type identifier, found: %v", name, a.List[3])
 					}
 					vars[string(varname)] = tp
 				} else if len(a.List) == 3 {
 					tp, err := in.exprType(fname, a.List[2], vars)
 					if err != nil {
-						return 0, err
+						return u, err
 					}
 					vars[string(varname)] = tp
 				} else {
-					return 0, fmt.Errorf("%v: incorrect number of arguments %v: %v", fname, name, a.List)
+					return u, fmt.Errorf("%v: incorrect number of arguments %v: %v", fname, name, a.List)
 				}
 			case "print":
 				for i, arg := range a.List[1:] {
 					_, err := in.exprType(fname, arg, vars)
 					if err != nil {
-						return 0, fmt.Errorf("%v: incorrect argument to print at posision %v: %v", fname, i, err)
+						return u, fmt.Errorf("%v: incorrect argument to print at posision %v: %v", fname, i, err)
 					}
 				}
 			default:
 				if _, err := in.exprType(fname, a, vars); err != nil {
-					return 0, fmt.Errorf("%v: %v", fname, err)
+					return u, fmt.Errorf("%v: %v", fname, err)
 				}
 			}
 		}
@@ -379,7 +449,12 @@ L:
 	return in.exprType(fname, body[len(body)-1], vars)
 }
 
+func (i *Interpret) evalParameter(fname, e Expr, vars map[string]Param) {
+
+}
+
 func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result Type, err error) {
+	const u = TypeUnknown
 	switch a := e.(type) {
 	case Int:
 		return TypeInt, nil
@@ -395,7 +470,7 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 		} else if t, ok := ParseType(string(a)); ok {
 			return t, nil
 		}
-		return 0, fmt.Errorf("Undefined variable: %v", string(a))
+		return u, fmt.Errorf("Undefined variable: %v", string(a))
 	case *Sexpr:
 		if a.Quoted || a.Empty() {
 			return TypeList, nil
@@ -405,11 +480,11 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 		}
 		ident, ok := a.List[0].(Ident)
 		if !ok {
-			return 0, fmt.Errorf("%v: expected ident, found: %v", fname, a.List[0])
+			return u, fmt.Errorf("%v: expected ident, found: %v", fname, a.List[0])
 		}
 		switch name := string(ident); name {
 		case "set", "set'":
-			return 0, fmt.Errorf("%v: unexpected %v and the end of function", fname, ident)
+			return u, fmt.Errorf("%v: unexpected %v and the end of function", fname, ident)
 		case "lambda":
 			return TypeFunc, nil
 		case "and", "or":
@@ -418,45 +493,45 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 			return TypeList, nil
 		case "apply":
 			if len(a.List) != 3 {
-				return 0, fmt.Errorf("%v: incorrect number of arguments to 'apply': %v", fname, a.List)
+				return u, fmt.Errorf("%v: incorrect number of arguments to 'apply': %v", fname, a.List)
 			}
 			ftype, err := i.exprType(fname, a.List[1], vars)
 			if err != nil {
-				return 0, err
+				return u, err
 			}
 			if ftype != TypeFunc {
-				return 0, fmt.Errorf("%v: apply expects function on first place, found: %v", fname, a.List[1])
+				return u, fmt.Errorf("%v: apply expects function on first place, found: %v", fname, a.List[1])
 			}
 			atype, err := i.exprType(fname, a.List[2], vars)
 			if err != nil {
-				return 0, err
+				return u, err
 			}
 			if atype != TypeList && atype != TypeUnknown {
-				return 0, fmt.Errorf("%v: apply expects list on second place, found: %v", fname, a.List[2])
+				return u, fmt.Errorf("%v: apply expects list on second place, found: %v", fname, a.List[2])
 			}
 			fi, ok := i.funcs[string(a.List[1].(Ident))]
 			if !ok {
-				return 0, fmt.Errorf("%v: unknown function supplied to apply: %v", fname, a.List[1])
+				return u, fmt.Errorf("%v: unknown function supplied to apply: %v", fname, a.List[1])
 			}
 			return fi.ReturnType(), nil
 		case "if":
 			if len(a.List) != 4 {
-				return 0, fmt.Errorf("%v: incorrect number of arguments to 'if': %v", fname, a.List)
+				return u, fmt.Errorf("%v: incorrect number of arguments to 'if': %v", fname, a.List)
 			}
 			condType, err := i.exprType(fname, a.List[1], vars)
 			if err != nil {
-				return 0, err
+				return u, err
 			}
 			if condType != TypeBool && condType != TypeUnknown {
-				return 0, fmt.Errorf("%v: condition in if-statement should return :bool, found: %v", fname, condType)
+				return u, fmt.Errorf("%v: condition in if-statement should return :bool, found: %v", fname, condType)
 			}
 			t1, err := i.exprType(fname, a.List[2], vars)
 			if err != nil {
-				return 0, err
+				return u, err
 			}
 			t2, err := i.exprType(fname, a.List[3], vars)
 			if err != nil {
-				return 0, err
+				return u, err
 			}
 			if t1 == TypeUnknown || t2 == TypeUnknown {
 				return TypeUnknown, nil
@@ -473,7 +548,7 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 				if tvar == TypeFunc || tvar == TypeUnknown {
 					return TypeUnknown, nil
 				}
-				return 0, fmt.Errorf("%v: expected '%v' to be function, found: %v", fname, name, tvar)
+				return u, fmt.Errorf("%v: expected '%v' to be function, found: %v", fname, name, tvar)
 			}
 			f, ok := i.funcs[name]
 			if !ok {
@@ -482,40 +557,40 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 			}
 
 			// check if we have matching func impl
-			params := []Parameter{}
+			params := []Param{}
 			for _, item := range a.List[1:] {
 				switch a := item.(type) {
 				case Int:
-					params = append(params, Parameter{T: TypeInt, V: item})
+					params = append(params, Param{T: TypeInt, V: item})
 				case Str:
-					params = append(params, Parameter{T: TypeStr, V: item})
+					params = append(params, Param{T: TypeStr, V: item})
 				case Bool:
-					params = append(params, Parameter{T: TypeBool, V: item})
+					params = append(params, Param{T: TypeBool, V: item})
 				case *Sexpr:
 					if a.Empty() || a.Quoted {
-						params = append(params, Parameter{T: TypeList, V: a})
+						params = append(params, Param{T: TypeList, V: a})
 					} else if a.Lambda {
-						params = append(params, Parameter{T: TypeFunc})
+						params = append(params, Param{T: TypeFunc})
 					} else {
 						itemType, err := i.exprType(fname, item, vars)
 						if err != nil {
-							return 0, err
+							return u, err
 						}
-						params = append(params, Parameter{T: itemType})
+						params = append(params, Param{T: itemType})
 					}
 				case Ident:
 					itemType, err := i.exprType(fname, item, vars)
 					if err != nil {
-						return 0, err
+						return u, err
 					}
-					params = append(params, Parameter{T: itemType})
+					params = append(params, Param{T: itemType})
 				default:
 					panic(fmt.Errorf("%v: unexpected type: %v", fname, item))
 				}
 			}
 			_, err := f.TryBind(params)
 			if err != nil {
-				return 0, fmt.Errorf("%v: %v", fname, err)
+				return u, fmt.Errorf("%v: %v", fname, err)
 			}
 
 			return f.ReturnType(), nil

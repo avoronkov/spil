@@ -5,56 +5,27 @@ import (
 	"strings"
 )
 
-type Type int
+type Type string
 
 const (
-	TypeUnknown Type = iota
-	TypeAny
-	TypeInt
-	TypeStr
-	TypeBool
-	TypeFunc
-	TypeList
+	TypeUnknown Type = ":unknown"
+	TypeAny     Type = ":any"
+	TypeInt     Type = ":int"
+	TypeStr     Type = ":str"
+	TypeBool    Type = ":bool"
+	TypeFunc    Type = ":func"
+	TypeList    Type = ":list"
 )
 
 func (t Type) String() string {
-	switch t {
-	case TypeUnknown:
-		return ":unknown"
-	case TypeAny:
-		return ":any"
-	case TypeInt:
-		return ":int"
-	case TypeStr:
-		return ":str"
-	case TypeBool:
-		return ":bool"
-	case TypeFunc:
-		return ":func"
-	case TypeList:
-		return ":list"
-	default:
-		panic(fmt.Errorf("Unexpected type: %d", int(t)))
-	}
+	return string(t)
 }
 
 func ParseType(token string) (Type, bool) {
-	switch token {
-	case ":any":
-		return TypeAny, true
-	case ":int":
-		return TypeInt, true
-	case ":str":
-		return TypeStr, true
-	case ":bool":
-		return TypeBool, true
-	case ":func":
-		return TypeFunc, true
-	case ":list":
-		return TypeList, true
-	default:
-		return TypeUnknown, false
+	if strings.HasPrefix(token, ":") {
+		return Type(token), true
 	}
+	return TypeUnknown, false
 }
 
 type ArgFmt struct {
@@ -135,14 +106,14 @@ func ParseArgFmt(argfmt Expr) (*ArgFmt, error) {
 
 }
 
-type Parameter struct {
+type Param struct {
 	T Type
 	V Expr
 }
 
-func MakeParametersFromArgs(args []Expr) (res []Parameter) {
+func MakeParametersFromArgs(args []Expr) (res []Param) {
 	for _, arg := range args {
-		p := Parameter{V: arg}
+		p := Param{V: arg}
 		switch arg.(type) {
 		case Int:
 			p.T = TypeInt

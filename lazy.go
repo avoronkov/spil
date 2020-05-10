@@ -9,8 +9,8 @@ var _ List = (*LazyList)(nil)
 
 type LazyList struct {
 	iter       Evaler
-	state      Expr
-	value      Expr
+	state      *Param
+	value      *Param
 	valueReady bool
 	tail       *LazyList
 	id         int64
@@ -18,7 +18,7 @@ type LazyList struct {
 
 var lazyHashCount int64
 
-func NewLazyList(iter Evaler, state Expr, hashable bool) *LazyList {
+func NewLazyList(iter Evaler, state *Param, hashable bool) *LazyList {
 	l := &LazyList{
 		iter:       iter,
 		state:      state,
@@ -64,7 +64,7 @@ func (l *LazyList) Print(w io.Writer) {
 		if err != nil {
 			panic(fmt.Errorf("Head() failed: %v", err))
 		}
-		val.Print(w)
+		val.V.Print(w)
 		ll, err = ll.Tail()
 		if err != nil {
 			panic(fmt.Errorf("Tail() failed: %v", err))
@@ -73,7 +73,7 @@ func (l *LazyList) Print(w io.Writer) {
 	io.WriteString(w, ")")
 }
 
-func (l *LazyList) Head() (Expr, error) {
+func (l *LazyList) Head() (*Param, error) {
 	// iter: state -> '(value, new-state)
 	// iter: value -> '(new-value)
 	// iter: value -> new-value
@@ -93,13 +93,15 @@ func (l *LazyList) Head() (Expr, error) {
 	return l.value, nil
 }
 
-func (l *LazyList) next() (value Expr, state Expr, err error) {
-	args := []Expr{l.state}
+func (l *LazyList) next() (value *Param, state *Param, err error) {
+	// fmt.Fprintf(os.Stderr, "next: %v\n", l.state)
+	args := []Param{*l.state}
+	returnType := l.iter.ReturnType()
 	expr, err := l.iter.Eval(args)
 	if err != nil {
 		return nil, nil, fmt.Errorf("LazyList: Eval(%v) failed: %v", args, err)
 	}
-	res, ok := expr.(*Sexpr)
+	res, ok := expr.V.(*Sexpr)
 	if !ok {
 		return expr, expr, nil
 	}
@@ -109,12 +111,15 @@ func (l *LazyList) next() (value Expr, state Expr, err error) {
 	}
 	if len(res.List) == 1 {
 		// state = value
-		return res.List[0], res.List[0], nil
+		p := &Param{V: res.List[0], T: returnType}
+		return p, p, nil
 	}
 	if len(res.List) != 2 {
 		return nil, nil, fmt.Errorf("Iterator result is too long: %v", res)
 	}
-	return res.List[0], res.List[1], nil
+	p1 := &Param{V: res.List[0], T: returnType}
+	p2 := &Param{V: res.List[1], T: returnType}
+	return p1, p2, nil
 }
 
 func (l *LazyList) Tail() (List, error) {

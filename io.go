@@ -11,7 +11,7 @@ type LazyInput struct {
 	file       io.ReadCloser
 	input      *bufio.Reader
 	valueReady bool
-	value      Expr
+	value      *Param
 	tail       *LazyInput
 }
 
@@ -24,7 +24,7 @@ func NewLazyInput(f io.ReadCloser) *LazyInput {
 	}
 }
 
-func (i *LazyInput) Head() (Expr, error) {
+func (i *LazyInput) Head() (*Param, error) {
 	log.Printf("Input.Head()")
 	if err := i.next(); err != nil {
 		return nil, err
@@ -73,7 +73,7 @@ func (i *LazyInput) next() error {
 	if err != nil {
 		return err
 	}
-	i.value = Str(string([]byte{b}))
+	i.value = &Param{V: Str(string([]byte{b})), T: TypeStr}
 	return nil
 }
 
@@ -89,7 +89,7 @@ func (i *LazyInput) Print(w io.Writer) {
 		return
 	}
 	h, _ := i.Head()
-	io.WriteString(w, string(h.(Str)))
+	io.WriteString(w, string(h.V.(Str)))
 	t, _ := i.Tail()
 	t.Print(w)
 }

@@ -1,5 +1,6 @@
 package main
 
+/*
 import "testing"
 
 func BenchmarkFEq(b *testing.B) {
@@ -19,3 +20,4 @@ func BenchmarkFEq(b *testing.B) {
 		b.Fatal(err)
 	}
 }
+*/

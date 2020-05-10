@@ -17,7 +17,7 @@ type Expr interface {
 
 type List interface {
 	Expr
-	Head() (Expr, error)
+	Head() (*Param, error)
 	Tail() (List, error)
 	Empty() bool
 }
@@ -25,6 +25,7 @@ type List interface {
 type Str string
 
 var _ List = Str("")
+var _ Appender = Str("")
 
 var NotStr = errors.New("Token is not a string")
 
@@ -39,11 +40,11 @@ func ParseString(token string) (Str, error) {
 	return Str(str), nil
 }
 
-func (s Str) Head() (Expr, error) {
+func (s Str) Head() (*Param, error) {
 	if s == "" {
 		return nil, fmt.Errorf("Cannot perform Head() on empty string")
 	}
-	return Str(string(s[0])), nil
+	return &Param{V: Str(string(s[0])), T: TypeStr}, nil
 }
 
 func (s Str) Tail() (List, error) {
@@ -69,16 +70,16 @@ func (s Str) Print(w io.Writer) {
 	io.WriteString(w, string(s))
 }
 
-func (s Str) Append(args []Expr) (Expr, error) {
+func (s Str) Append(args []Param) (*Param, error) {
 	result := string(s)
 	for i, arg := range args {
-		str, ok := arg.(Str)
+		str, ok := arg.V.(Str)
 		if !ok {
 			return nil, fmt.Errorf("Str.Append() expect argument at position %v to be Str, found: %v", i, arg)
 		}
 		result += string(str)
 	}
-	return Str(result), nil
+	return &Param{V: Str(result), T: TypeStr}, nil
 }
 
 func (s Str) Type() Type {
@@ -134,6 +135,7 @@ func (i Bool) Type() Type {
 }
 
 var _ List = (*Sexpr)(nil)
+var _ Appender = (*Sexpr)(nil)
 
 type Sexpr struct {
 	List   []Expr
@@ -202,11 +204,11 @@ func (s *Sexpr) Len() int {
 	return len(s.List)
 }
 
-func (s *Sexpr) Head() (Expr, error) {
+func (s *Sexpr) Head() (*Param, error) {
 	if len(s.List) == 0 {
 		return nil, fmt.Errorf("Cannot perform Head() on empty list")
 	}
-	return s.List[0], nil
+	return &Param{V: s.List[0], T: TypeAny}, nil
 }
 
 func (s *Sexpr) Tail() (List, error) {
@@ -223,10 +225,17 @@ func (s *Sexpr) Empty() bool {
 	return len(s.List) == 0
 }
 
-func (s *Sexpr) Append(args []Expr) (Expr, error) {
-	return &Sexpr{
-		List:   append(s.List, args...),
-		Quoted: s.Quoted,
+func (s *Sexpr) Append(params []Param) (*Param, error) {
+	args := make([]Expr, 0, len(params))
+	for _, p := range params {
+		args = append(args, p.V)
+	}
+	return &Param{
+		V: &Sexpr{
+			List:   append(s.List, args...),
+			Quoted: s.Quoted,
+		},
+		T: TypeList,
 	}, nil
 }
 
