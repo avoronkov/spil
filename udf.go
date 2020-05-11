@@ -117,7 +117,8 @@ type FuncRuntime struct {
 
 func NewFuncRuntime(fi *FuncInterpret) *FuncRuntime {
 	return &FuncRuntime{
-		fi: fi,
+		fi:   fi,
+		vars: make(map[string]Param),
 	}
 }
 
@@ -135,7 +136,6 @@ func keyOfArgs(args []Expr) (string, error) {
 
 func (f *FuncRuntime) bind(params []Param) (impl *FuncImpl, result *Param, err error) {
 	f.cleanup()
-	// params := MakeParametersFromArgs(args)
 	args := make([]Expr, 0, len(params))
 	for _, p := range params {
 		args = append(args, p.V)
@@ -723,5 +723,4 @@ func (f *FuncRuntime) cleanup() {
 		}
 	}
 	f.scopedVars = f.scopedVars[:0]
-	f.vars = make(map[string]Param)
 }
