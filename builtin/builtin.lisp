@@ -82,14 +82,14 @@
 (def nth (n:int lst:list) :any (head (drop (- n 1) lst)))
 
 
-(def first  (lst) (nth 1 lst))
-(def second (lst) (nth 2 lst))
-(def third  (lst) (nth 3 lst))
+(def first  (lst:list) :any (nth 1 lst))
+(def second (lst:list) :any (nth 2 lst))
+(def third  (lst:list) :any (nth 3 lst))
 
 
 ;; reduce
-(def reduce (fn '() acc) acc)
-(def reduce (fn lst acc) (reduce fn (tail lst) (fn (head lst) acc)))
+(def reduce (fn:func '() acc:any) :any acc)
+(def reduce (fn:func lst:list acc:any) :any (reduce fn (tail lst) (fn (head lst) acc)))
 
 
 ;; lazy concat

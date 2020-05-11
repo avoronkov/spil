@@ -214,6 +214,118 @@ Second time it will return the stored result.
 ; 10
 ```
 
+### Work with files
+
+You can work with files as lazy-strings (?).
+Well, it means that you can open file and iterate over its content with `head` and `tail` methods.
+It may seems kinda low-lever so I've implemented functions `lines` and `words` to split string into lines of words
+and these functions are also lazy.
+
+```
+(set' file (open "somefile.txt"))
+
+(print (map words (lines files))
+```
+
+Note that operator `set'` is used instead of simple `set`.
+It means that file will be automatically closed when interpreter leaves the current function scope.
+
+(Writing into files is not implemented yet.)
+
+## Types
+
+You can specify types of your function parameters and function's return value.
+```
+(def contains (value:any '()) :bool 'F)
+(def contains (value:any lst:list) :bool
+	(if (= (head lst) value)
+		'T
+		(contains value (tail lst))))
+
+(print (contains 4 '(1 3 5 8)))
+```
+
+The following builtin type are available: `:int`, `:str`, `:bool`, `:list`, `:any`.
+
+## Static type checking
+
+SPIL checks the correctness of types usage in "compile time", i.e. before actual execution of the the program.
+You can specify option "--check" (or "-c") for syntax and type checking of the program.
+E.g. when you misplace the arguments in previous example (`(print (contains '(1 3 5 8) 4))`) you will get the following error:
+```
+$ spil -c example.lisp
+__main__: contains: no matching function implementaion found for [{:list {S': {Int64: 1} {Int64: 3} {Int64: 5} {Int64: 8}}} {:int {Int64: 5}}]
+```
+
+## Type casting
+
+Sometimes you need to cast expressions types. E.g. in the following example:
+```
+(def ascending? (l:list) :bool
+     (if (<= (length l) 1)
+       'T
+       (if (> (first l) (second l))
+         'F
+         (ascending? (tail l)))))
+
+(print (ascending? '(1 2 3 5 8)))
+```
+you will get the error:
+```
+ascending?: >: Expected all integer arguments, found {:any <nil>} at position 0
+```
+because `nth` returns `:any` but `>` expects `:int`.
+So you can fix it with casting first and second elemets to `:int`:
+```
+(def ascending? (l:list) :bool
+     (if (<= (length l) 1)
+       'T
+       (if (> (do (first l) :int) (do (second l) :int))
+         'F
+         (ascending? (tail l)))))
+```
+I may look strange but actually it's rather simple. SPIL has the following forms of types casting:
+```
+; convert result of function to :int
+(def get-int () :int (function-returning-any) :int)
+
+; variable var has type :int now
+(set var (function-returning-any) :int)
+
+; convert return of do-block to :int
+(do (function-returning-any) :int)
+```
+
+## User defined types
+
+You may define your own type with `deftype` statement:
+```
+; (deftype new-type parent-type)
+(deftype :my-type :any)
+```
+It may be helpful in some scenarios, i.e. if we want to implement simple "type-safe" set:
+```
+(deftype :set :list)
+
+(def set-new () :set '() :set)
+(def set-add (elem:any s:set) :set
+	(if (contains elem s)
+	  s
+	  (do (append s elem) :set)))
+
+;; This will cause typecheck error:
+(set-add '(1 2 2 4 5) 6)
+
+;; This is OK
+(set s1 (set-add (set-new) 1))
+(set s2 (set-add s1 2))
+(set s3 (set-add s2 2))
+(set s4 (set-add s3 3))
+
+(print s4 (length s4))
+```
+Note that you cannot use :list variable where :set is required, but you can pass :set anywhere where its parent type (:list) is accepted.
+
 ## Examples
 
 You can find some examples of code [here](https://gitlab.com/avoronkov/spil/-/tree/master/examples)
@@ -232,4 +344,6 @@ You can find some examples of code [here](https://gitlab.com/avoronkov/spil/-/tr
 
 - [+] anonymous functions (?)
 
-- function "list"
+- [+] function "list"
+
+- restricted type casting and strict mode.
