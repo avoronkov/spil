@@ -1,7 +1,7 @@
 ;; standard lisp functions
 
 ;; lazy filter
-(def filter (pred lst)
+(def filter (pred lst) :list
 	 (set
 	   filt
 	   (lambda
@@ -12,7 +12,7 @@
 			 (self (tail _1))))))
 	 (gen filt lst))
 
-(def filter' (pred lst)
+(def filter' (pred lst) :list
 	 (set
 	   filt
 	   (lambda
@@ -25,7 +25,7 @@
 
 
 ;; lazy map
-(def map (fn lst)
+(def map (fn lst) :list
 	 (set
 	   iter
 	   (lambda
@@ -34,7 +34,7 @@
 		   (list (fn (head _1)) (tail _1)))))
 	 (gen iter lst))
 
-(def map' (fn lst)
+(def map' (fn lst) :list
 	 (set
 	   iter
 	   (lambda
@@ -44,7 +44,7 @@
 	 (gen' iter lst))
 
 ;; take first n values from list
-(def take (n lst)
+(def take (n lst) :list
 	 (set
 	   iter
 	   (lambda
@@ -62,7 +62,7 @@
 
 
 ;; take elements from list while condition is true
-(def take-while (pred lst)
+(def take-while (pred lst) :list
 	 (set
 	   iter
 	   (lambda
@@ -79,21 +79,21 @@
 
 ;; take nth element from list.
 ;; Elements numeration is started from 1 (!).
-(def nth (n lst) (head (drop (- n 1) lst)))
+(def nth (n:int lst:list) :any (head (drop (- n 1) lst)))
 
 
-(def first  (lst) (nth 1 lst))
-(def second (lst) (nth 2 lst))
-(def third  (lst) (nth 3 lst))
+(def first  (lst:list) :any (nth 1 lst))
+(def second (lst:list) :any (nth 2 lst))
+(def third  (lst:list) :any (nth 3 lst))
 
 
 ;; reduce
-(def reduce (fn '() acc) acc)
-(def reduce (fn lst acc) (reduce fn (tail lst) (fn (head lst) acc)))
+(def reduce (fn:func '() acc:any) :any acc)
+(def reduce (fn:func lst:list acc:any) :any (reduce fn (tail lst) (fn (head lst) acc)))
 
 
 ;; lazy concat
-(def concat lists
+(def concat lists :list
 	 ; return one element at the time
 	 (set iter
 		  (lambda
@@ -108,6 +108,6 @@
 
 
 ;; length
-(def length (lst) (length lst 0))
-(def length ('() acc) acc)
-(def length (lst acc) (length (tail lst) (+ acc 1)))
+(def length (lst:list) :int (length lst 0))
+(def length ('() acc:int) :int acc)
+(def length (lst:list acc:int) :int (length (tail lst) (+ acc 1)))

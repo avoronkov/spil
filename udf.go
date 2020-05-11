@@ -12,33 +12,34 @@ import (
 // User-defined functions
 
 type FuncInterpret struct {
-	interpret *Interpret
-	name      string
-	bodies    []*FuncImpl
+	interpret  *Interpret
+	name       string
+	bodies     []*FuncImpl
+	returnType Type
 }
 
 type FuncImpl struct {
-	argfmt Expr
+	argfmt *ArgFmt
 	body   []Expr
 	// Do we need to remenber function results?
 	memo bool
 	// Function results: args.Repr() -> Result
-	results map[string]Expr
+	results map[string]*Param
 }
 
-func NewFuncImpl(argfmt Expr, body []Expr, memo bool) *FuncImpl {
+func NewFuncImpl(argfmt *ArgFmt, body []Expr, memo bool) *FuncImpl {
 	i := &FuncImpl{
 		argfmt: argfmt,
 		body:   body,
 		memo:   memo,
 	}
 	if memo {
-		i.results = make(map[string]Expr)
+		i.results = make(map[string]*Param)
 	}
 	return i
 }
 
-func (i *FuncImpl) RememberResult(name string, args []Expr, result Expr) {
+func (i *FuncImpl) RememberResult(name string, args []Expr, result *Param) {
 	keyArgs, err := keyOfArgs(args)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v: cannot rememer result for %v: %v\n", name, args, err)
@@ -52,32 +53,42 @@ func (i *FuncImpl) RememberResult(name string, args []Expr, result Expr) {
 
 func NewFuncInterpret(i *Interpret, name string) *FuncInterpret {
 	return &FuncInterpret{
-		interpret: i,
-		name:      name,
+		interpret:  i,
+		name:       name,
+		returnType: TypeUnknown,
 	}
 }
 
-func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr, memo bool) error {
+func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr, memo bool, returnType Type) error {
+	if len(f.bodies) > 0 && returnType != f.returnType {
+		return fmt.Errorf("%v: cannot redefine return type: previous %v, current %v", f.name, f.returnType, returnType)
+	}
 	if argfmt == nil {
 		f.bodies = append(f.bodies, NewFuncImpl(nil, body, memo))
 		return nil
 	}
-	switch argfmt.(type) {
-	case Ident:
-		// pass arguments as list with specified name
-		f.bodies = append(f.bodies, NewFuncImpl(argfmt, body, memo))
-	case *Sexpr:
-		// bind arguments
-		f.bodies = append(f.bodies, NewFuncImpl(argfmt, body, memo))
-	default:
-		return fmt.Errorf("Expected arguments signature, found: %v", argfmt)
+	af, err := ParseArgFmt(argfmt)
+	if err != nil {
+		return err
 	}
+	f.bodies = append(f.bodies, NewFuncImpl(af, body, memo))
+
+	f.returnType = returnType
 	return nil
 }
 
-func (f *FuncInterpret) Eval(args []Expr) (Expr, error) {
+func (f *FuncInterpret) TryBind(params []Param) (int, error) {
+	for idx, im := range f.bodies {
+		if f.matchParameters(im.argfmt, params) {
+			return idx, nil
+		}
+	}
+	return -1, fmt.Errorf("%v: no matching function implementaion found for %v", f.name, params)
+}
+
+func (f *FuncInterpret) Eval(params []Param) (result *Param, err error) {
 	run := NewFuncRuntime(f)
-	impl, result, err := run.bind(args)
+	impl, result, err := run.bind(params)
 	if err != nil {
 		return nil, err
 	}
@@ -92,9 +103,13 @@ func (f *FuncInterpret) Eval(args []Expr) (Expr, error) {
 	return res, err
 }
 
+func (f *FuncInterpret) ReturnType() Type {
+	return f.returnType
+}
+
 type FuncRuntime struct {
 	fi   *FuncInterpret
-	vars map[string]Expr
+	vars map[string]Param
 	args []Expr
 	// variables that should be Closed after leaving this variable scope.
 	scopedVars []string
@@ -118,68 +133,89 @@ func keyOfArgs(args []Expr) (string, error) {
 	return b.String(), nil
 }
 
-func (f *FuncRuntime) bind(args []Expr) (impl *FuncImpl, result Expr, err error) {
+func (f *FuncRuntime) bind(params []Param) (impl *FuncImpl, result *Param, err error) {
 	f.cleanup()
-	argfmtFound := false
-	for idx, im := range f.fi.bodies {
-		if matchArgs(im.argfmt, args) {
-			impl = f.fi.bodies[idx]
-			argfmtFound = true
-			if im.memo {
-				keyArgs, err := keyOfArgs(args)
-				if err != nil {
-					log.Printf("Cannot compute hash of args: %v, %v", args, err)
-				} else if res, ok := im.results[keyArgs]; ok {
-					return nil, res, nil
-				}
-			}
-			break
+	// params := MakeParametersFromArgs(args)
+	args := make([]Expr, 0, len(params))
+	for _, p := range params {
+		args = append(args, p.V)
+	}
+	idx, err := f.fi.TryBind(params)
+	if err != nil {
+		return nil, nil, err
+	}
+	impl = f.fi.bodies[idx]
+	if impl.memo {
+		keyArgs, err := keyOfArgs(args)
+		if err != nil {
+			log.Printf("Cannot compute hash of args: %v, %v", args, err)
+		} else if res, ok := impl.results[keyArgs]; ok {
+			return nil, res, nil
 		}
 	}
-	if !argfmtFound {
-		err = fmt.Errorf("No matching function implementation for %v found", f.fi.name)
-		return
-	}
+
 	if impl.argfmt != nil {
-		switch a := impl.argfmt.(type) {
-		case Ident:
-			f.vars[string(a)] = &Sexpr{List: args, Quoted: true}
-		case *Sexpr:
-			if l := a.Len(); l != len(args) {
-				err = fmt.Errorf("Incorrect number of arguments to %v: expected %v, found %v", f.fi.name, l, len(args))
+		if impl.argfmt.Wildcard != "" {
+			f.vars[impl.argfmt.Wildcard] = Param{
+				V: &Sexpr{List: args, Quoted: true},
+				T: TypeList,
+			}
+		} else {
+			if l := len(impl.argfmt.Args); l != len(params) {
+				err = fmt.Errorf("Incorrect number of arguments to %v: expected %v, found %v", f.fi.name, l, len(params))
 				return
 			}
-			for i, ident := range a.List {
-				if iname, ok := ident.(Ident); ok {
-					f.vars[string(iname)] = args[i]
+			for i, arg := range impl.argfmt.Args {
+				if arg.V == nil {
+					f.vars[arg.Name] = params[i]
 				}
 			}
 		}
 	}
 	// bind to __args and _1, _2 ... variables
-	f.vars["__args"] = &Sexpr{List: args, Quoted: true}
-	for i, arg := range args {
+	f.vars["__args"] = Param{
+		V: &Sexpr{List: args, Quoted: true},
+		T: TypeList,
+	}
+	for i, arg := range params {
 		f.vars[fmt.Sprintf("_%d", i+1)] = arg
 	}
 	f.args = args
 	return impl, nil, nil
 }
 
-func (f *FuncRuntime) Eval(impl *FuncImpl) (res Expr, err error) {
+func (f *FuncRuntime) Eval(impl *FuncImpl) (res *Param, err error) {
 	memoImpl := impl
 	memoArgs := f.args
 L:
 	for {
 		last := len(impl.body) - 1
+		if last < 0 {
+			break L
+		}
+		var bodyForceType *Type
+		if id, ok := impl.body[last].(Ident); ok {
+			if tp, ok := ParseType(string(id)); ok {
+				// Last statement is type declaration
+				last--
+				bodyForceType = &tp
+			}
+		}
 		for i, expr := range impl.body {
 			if i == last {
 				// check for tail call
-				e, err := f.lastExpr(expr)
+				e, forceType, err := f.lastParameter(expr)
 				if err != nil {
 					return nil, err
 				}
-				lst, ok := e.(*Sexpr)
+				lst, ok := e.V.(*Sexpr)
 				if !ok {
+					if forceType != nil {
+						e.T = *forceType
+					}
+					if bodyForceType != nil {
+						e.T = *bodyForceType
+					}
 					if memoImpl.memo {
 						// lets remenber the result
 						memoImpl.RememberResult(f.fi.name, memoArgs, e)
@@ -188,18 +224,31 @@ L:
 					return e, nil
 				}
 				if lst.Quoted || lst.Len() == 0 {
+					p := &Param{V: lst, T: TypeList}
+					if forceType != nil {
+						p.T = *forceType
+					}
+					if bodyForceType != nil {
+						p.T = *bodyForceType
+					}
 					if memoImpl.memo {
 						// lets remenber the result
-						memoImpl.RememberResult(f.fi.name, memoArgs, lst)
+						memoImpl.RememberResult(f.fi.name, memoArgs, p)
 					}
-					return lst, nil
+					return p, nil
 				}
 				head, _ := lst.Head()
-				hident, ok := head.(Ident)
+				hident, ok := head.V.(Ident)
 				if !ok || (string(hident) != f.fi.name && string(hident) != "self") {
 					result, err := f.evalFunc(lst)
 					if err != nil {
 						return nil, err
+					}
+					if forceType != nil {
+						result.T = *forceType
+					}
+					if bodyForceType != nil {
+						result.T = *bodyForceType
 					}
 					if memoImpl.memo {
 						// lets remenber the result
@@ -211,15 +260,15 @@ L:
 				t, _ := lst.Tail()
 				tail := t.(*Sexpr)
 				// eval args
-				args := make([]Expr, 0, len(tail.List))
+				args := make([]Param, 0, len(tail.List))
 				for _, ar := range tail.List {
-					arg, err := f.evalExpr(ar)
+					arg, err := f.evalParameter(ar)
 					if err != nil {
 						return nil, err
 					}
-					args = append(args, arg)
+					args = append(args, *arg)
 				}
-				var result Expr
+				var result *Param
 				impl, result, err = f.bind(args)
 				if err != nil {
 					return nil, err
@@ -229,7 +278,7 @@ L:
 				}
 				continue L
 			} else {
-				res, err = f.evalExpr(expr)
+				res, err = f.evalParameter(expr)
 				if err != nil {
 					return nil, err
 				}
@@ -239,154 +288,224 @@ L:
 	return
 }
 
-func (f *FuncRuntime) lastExpr(e Expr) (Expr, error) {
+func (f *FuncRuntime) lastParameter(e Expr) (*Param, *Type, error) {
 	switch a := e.(type) {
 	case Int:
-		return a, nil
+		return &Param{V: a, T: TypeInt}, nil, nil
 	case Str:
-		return a, nil
+		return &Param{V: a, T: TypeStr}, nil, nil
 	case Bool:
-		return a, nil
+		return &Param{V: a, T: TypeBool}, nil, nil
 	case Ident:
 		if value, ok := f.vars[string(a)]; ok {
-			return value, nil
+			return &value, nil, nil
 		}
-		return a, nil
+		return &Param{V: a, T: TypeUnknown}, nil, nil
 	case *Sexpr:
 		if a.Quoted {
-			return a, nil
+			return &Param{V: a, T: TypeList}, nil, nil
 		}
 		if a.Len() == 0 {
-			return nil, fmt.Errorf("%v: Unexpected empty s-expression: %v", f.fi.name, a)
+			return nil, nil, fmt.Errorf("%v: Unexpected empty s-expression: %v", f.fi.name, a)
 		}
 		head, _ := a.Head()
-		if name, ok := head.(Ident); ok {
+		if name, ok := head.V.(Ident); ok {
 			if a.Lambda {
-				return f.evalLambda(&Sexpr{List: []Expr{a}, Quoted: true})
+				lm, err := f.evalLambda(&Sexpr{List: []Expr{a}, Quoted: true})
+				if err != nil {
+					return nil, nil, err
+				}
+				return &Param{
+					V: lm,
+					T: TypeFunc,
+				}, nil, nil
 			}
 			if name == "lambda" {
 				tail, _ := a.Tail()
-				return f.evalLambda(tail.(*Sexpr))
+				lm, err := f.evalLambda(tail.(*Sexpr))
+				if err != nil {
+					return nil, nil, err
+				}
+				return &Param{
+					V: lm,
+					T: TypeFunc,
+				}, nil, nil
 			}
 			if name == "if" {
 				// (cond) (expr-if-true) (expr-if-false)
 				if len(a.List) != 4 {
-					return nil, fmt.Errorf("Expected 3 arguments to if, found: %v", a.List[1:])
+					return nil, nil, fmt.Errorf("Expected 3 arguments to if, found: %v", a.List[1:])
 				}
 				arg := a.List[1]
-				res, err := f.evalExpr(arg)
+				res, err := f.evalParameter(arg)
 				if err != nil {
-					return nil, err
+					return nil, nil, err
 				}
-				boolRes, ok := res.(Bool)
+				boolRes, ok := res.V.(Bool)
 				if !ok {
-					return nil, fmt.Errorf("Argument %v should evaluate to boolean value, actual %v", arg, res)
+					return nil, nil, fmt.Errorf("Argument %v should evaluate to boolean value, actual %v", arg, res)
 				}
 				if bool(boolRes) {
-					return f.lastExpr(a.List[2])
+					return f.lastParameter(a.List[2])
 				}
-				return f.lastExpr(a.List[3])
+				return f.lastParameter(a.List[3])
 			}
 			if name == "do" {
-				if len(a.List) < 2 {
-					return nil, fmt.Errorf("do: empty body")
+				var retType *Type
+				last := len(a.List) - 1
+				if id, ok := a.List[last].(Ident); ok {
+					if rt, ok := ParseType(string(id)); ok {
+						// Last statement is type declaration
+						last--
+						retType = &rt
+					}
 				}
-				if len(a.List) > 2 {
-					for _, st := range a.List[1 : len(a.List)-1] {
-						if _, err := f.evalExpr(st); err != nil {
-							return nil, err
+				if last == 0 {
+					return nil, nil, fmt.Errorf("do: empty body")
+				}
+				if last > 1 {
+					for _, st := range a.List[1:last] {
+						if _, err := f.evalParameter(st); err != nil {
+							return nil, nil, err
 						}
 					}
 				}
-				return f.lastExpr(a.List[len(a.List)-1])
+				ret, ft, err := f.lastParameter(a.List[last])
+				if err != nil {
+					return nil, nil, err
+				}
+				if retType != nil {
+					// TODO check matching types
+					ret.T = *retType
+					ft = retType
+				}
+				return ret, ft, nil
 			}
 			if name == "and" {
 				for _, arg := range a.List[1:] {
-					res, err := f.evalExpr(arg)
+					res, err := f.evalParameter(arg)
 					if err != nil {
-						return nil, err
+						return nil, nil, err
 					}
-					boolRes, ok := res.(Bool)
+					boolRes, ok := res.V.(Bool)
 					if !ok {
-						return nil, fmt.Errorf("and: rrgument %v should evaluate to boolean value, actual %v", arg, res)
+						return nil, nil, fmt.Errorf("and: rrgument %v should evaluate to boolean value, actual %v", arg, res)
 					}
 					if !bool(boolRes) {
-						return Bool(false), nil
+						return &Param{
+							V: Bool(false),
+							T: TypeBool,
+						}, nil, nil
 					}
 				}
-				return Bool(true), nil
+				return &Param{
+					V: Bool(true),
+					T: TypeBool,
+				}, nil, nil
 			}
 			if name == "or" {
 				for _, arg := range a.List[1:] {
-					res, err := f.evalExpr(arg)
+					res, err := f.evalParameter(arg)
 					if err != nil {
-						return nil, err
+						return nil, nil, err
 					}
-					boolRes, ok := res.(Bool)
+					boolRes, ok := res.V.(Bool)
 					if !ok {
-						return nil, fmt.Errorf("and: rrgument %v should evaluate to boolean value, actual %v", arg, res)
+						return nil, nil, fmt.Errorf("and: rrgument %v should evaluate to boolean value, actual %v", arg, res)
 					}
 					if bool(boolRes) {
-						return Bool(true), nil
+						return &Param{
+							V: Bool(true),
+							T: TypeBool,
+						}, nil, nil
 					}
 				}
-				return Bool(false), nil
+				return &Param{
+					V: Bool(false),
+					T: TypeBool,
+				}, nil, nil
 			}
 			if name == "set" || name == "set'" {
 				tail, _ := a.Tail()
 				if err := f.setVar(tail.(*Sexpr) /*scoped*/, name == "set'"); err != nil {
-					return nil, err
+					return nil, nil, err
 				}
-				return QEmpty, nil
+				return &Param{V: QEmpty, T: TypeAny}, nil, nil
 			}
 			if name == "gen" || name == "gen'" {
 				tail, _ := a.Tail()
-				return f.evalGen(tail.(*Sexpr) /*hashable*/, name == "gen'")
+				gen, err := f.evalGen(tail.(*Sexpr) /*hashable*/, name == "gen'")
+				if err != nil {
+					return nil, nil, err
+				}
+				return &Param{V: gen, T: TypeList}, nil, nil
 			}
 			if name == "apply" {
 				tail, _ := a.Tail()
-				return f.evalApply(tail.(*Sexpr))
+				res, err := f.evalApply(tail.(*Sexpr))
+				if err != nil {
+					return nil, nil, err
+				}
+				return &Param{V: res, T: TypeUnknown}, nil, nil
 			}
 		}
 
 		// return unevaluated list
-		return a, nil
+		return &Param{V: a, T: TypeUnknown}, nil, nil
 	case *LazyList:
-		return a, nil
+		return &Param{V: a, T: TypeList}, nil, nil
 	}
 	panic(fmt.Errorf("%v: Unexpected Expr type: %v (%T)", f.fi.name, e, e))
 }
 
-func (f *FuncRuntime) evalExpr(expr Expr) (Expr, error) {
-	e, err := f.lastExpr(expr)
+func (f *FuncRuntime) evalParameter(expr Expr) (p *Param, err error) {
+	var forceType *Type
+	defer func() {
+		if p != nil && forceType != nil {
+			p.T = *forceType
+		}
+	}()
+	e, ft, err := f.lastParameter(expr)
+	forceType = ft
 	if err != nil {
 		return nil, err
 	}
-	lst, ok := e.(*Sexpr)
+	lst, ok := e.V.(*Sexpr)
 	if !ok {
 		// nothing to evaluate
 		return e, nil
 	}
 	if lst.Quoted || lst.Len() == 0 {
-		return lst, nil
+		return e, nil
 	}
 	return f.evalFunc(lst)
 }
 
 // (var-name) (value)
 func (f *FuncRuntime) setVar(se *Sexpr, scoped bool) error {
-	if se.Len() != 2 {
-		return fmt.Errorf("set wants 2 argument, found %v", se)
+	if se.Len() != 2 && se.Len() != 3 {
+		return fmt.Errorf("set wants 2 or 3 arguments, found %v", se)
 	}
 	name, ok := se.List[0].(Ident)
 	if !ok {
 		return fmt.Errorf("set expected identifier first, found %v", se.List[0])
 	}
-	value, err := f.evalExpr(se.List[1])
+	value, err := f.evalParameter(se.List[1])
 	if err != nil {
 		return err
 	}
-	f.vars[string(name)] = value
+	if se.Len() == 3 {
+		id, ok := se.List[2].(Ident)
+		if !ok {
+			return fmt.Errorf("%v: set expects type identifier, found: %v", f.fi.name, se.List[2])
+		}
+		t, err := f.fi.interpret.parseType(string(id))
+		if err != nil {
+			return err
+		}
+		value.T = t
+	}
+	f.vars[string(name)] = *value
 	if scoped {
 		f.scopedVars = append(f.scopedVars, string(name))
 	}
@@ -398,11 +517,11 @@ func (f *FuncRuntime) evalGen(se *Sexpr, hashable bool) (Expr, error) {
 	if se.Len() != 2 {
 		return nil, fmt.Errorf("gen wants 2 argument, found %v", se)
 	}
-	fn, err := f.evalExpr(se.List[0])
+	fn, err := f.evalParameter(se.List[0])
 	if err != nil {
 		return nil, err
 	}
-	fident, ok := fn.(Ident)
+	fident, ok := fn.V.(Ident)
 	if !ok {
 		return nil, fmt.Errorf("gen expects first argument to be a funtion, found: %v", se.List[0])
 	}
@@ -410,7 +529,7 @@ func (f *FuncRuntime) evalGen(se *Sexpr, hashable bool) (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	state, err := f.evalExpr(se.List[1])
+	state, err := f.evalParameter(se.List[1])
 	if err != nil {
 		return nil, err
 	}
@@ -420,7 +539,10 @@ func (f *FuncRuntime) evalGen(se *Sexpr, hashable bool) (Expr, error) {
 func (f *FuncRuntime) findFunc(fname string) (Evaler, error) {
 	// Ability to pass function name as argument
 	if v, ok := f.vars[fname]; ok {
-		vident, ok := v.(Ident)
+		if v.T != TypeFunc && v.T != TypeUnknown {
+			return nil, fmt.Errorf("%v: incorrect type of '%v', expected :func, found: %v", f.fi.name, fname, v)
+		}
+		vident, ok := v.V.(Ident)
 		if !ok {
 			return nil, fmt.Errorf("%v: cannot use argument %v as function", f.fi.name, v)
 		}
@@ -434,12 +556,12 @@ func (f *FuncRuntime) findFunc(fname string) (Evaler, error) {
 }
 
 // (func-name) (args...)
-func (f *FuncRuntime) evalFunc(se *Sexpr) (Expr, error) {
+func (f *FuncRuntime) evalFunc(se *Sexpr) (*Param, error) {
 	head, err := se.Head()
 	if err != nil {
 		return nil, err
 	}
-	name, ok := head.(Ident)
+	name, ok := head.V.(Ident)
 	if !ok {
 		return nil, fmt.Errorf("Wanted identifier, found: %v (%v)", head, se)
 	}
@@ -452,13 +574,13 @@ func (f *FuncRuntime) evalFunc(se *Sexpr) (Expr, error) {
 	// evaluate arguments
 	t, _ := se.Tail()
 	tail := t.(*Sexpr)
-	args := make([]Expr, 0, len(tail.List))
+	args := make([]Param, 0, len(tail.List))
 	for _, arg := range tail.List {
-		res, err := f.evalExpr(arg)
+		res, err := f.evalParameter(arg)
 		if err != nil {
 			return nil, err
 		}
-		args = append(args, res)
+		args = append(args, *res)
 	}
 	result, err := fu.Eval(args)
 	return result, err
@@ -468,7 +590,7 @@ func (f *FuncRuntime) evalLambda(se *Sexpr) (Expr, error) {
 	name := f.fi.interpret.NewLambdaName()
 	fi := NewFuncInterpret(f.fi.interpret, name)
 	body := f.replaceVars(se.List)
-	fi.AddImpl(nil, body, false)
+	fi.AddImpl(nil, body, false, TypeAny)
 	f.fi.interpret.funcs[name] = fi
 	return Ident(name), nil
 }
@@ -486,7 +608,7 @@ func (f *FuncRuntime) replaceVars(st []Expr) (res []Expr) {
 			if lambdaArgRe.MatchString(string(a)) {
 				res = append(res, a)
 			} else if v, ok := f.vars[string(a)]; ok {
-				res = append(res, v)
+				res = append(res, v.V)
 			} else {
 				res = append(res, a)
 			}
@@ -501,18 +623,18 @@ func (f *FuncRuntime) evalApply(se *Sexpr) (Expr, error) {
 	if len(se.List) != 2 {
 		return nil, fmt.Errorf("apply expects function with list of arguments")
 	}
-	res, err := f.evalExpr(se.List[1])
+	res, err := f.evalParameter(se.List[1])
 	if err != nil {
 		return nil, err
 	}
-	args, ok := res.(List)
+	args, ok := res.V.(List)
 	if !ok {
 		return nil, fmt.Errorf("apply expects result to be a list of argument")
 	}
 	cmd := []Expr{se.List[0]}
 	for !args.Empty() {
 		h, _ := args.Head()
-		cmd = append(cmd, h)
+		cmd = append(cmd, h.V)
 		args, _ = args.Tail()
 	}
 
@@ -521,84 +643,75 @@ func (f *FuncRuntime) evalApply(se *Sexpr) (Expr, error) {
 	}, nil
 }
 
-func matchArgs(argfmt Expr, args []Expr) (result bool) {
+func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []Param) (result bool) {
 	if argfmt == nil {
 		// null matches everything (lambda case)
 		return true
 	}
-	binds := map[string]Expr{}
-	switch a := argfmt.(type) {
-	case *Sexpr:
-		if len(a.List) == 0 && len(args) == 0 {
-			return true
-		}
-		if len(a.List) != len(args) {
-			return false
-		}
-		for i, t := range a.List {
-			switch at := t.(type) {
-			case Int:
-				v, ok := args[i].(Int)
-				if !ok || !at.Eq(v) {
-					return false
-				}
-			case Str:
-				v, ok := args[i].(Str)
-				if !ok || at != v {
-					return false
-				}
-			case Bool:
-				v, ok := args[i].(Bool)
-				if !ok || at != v {
-					return false
-				}
-			case *Sexpr:
-				if at.Empty() {
-					// special case to match empty lazy list
-					if v, ok := args[i].(List); !ok || !v.Empty() {
-						return false
-					}
-				} else {
-					v, ok := args[i].(*Sexpr)
-					if !ok {
-						return false
-					}
-					h1, err := at.Hash()
-					if err != nil {
-						return false
-					}
-					h2, err := v.Hash()
-					if err != nil {
-						return false
-					}
-					if h1 != h2 {
-						return false
-					}
-				}
-			case Ident:
-				// check if param is already binded
-				if val, ok := binds[string(at)]; ok {
-					if val.String() != args[i].String() {
-						return false
-					}
-				}
-				binds[string(at)] = args[i]
-			default:
-				panic(fmt.Errorf("Unexpected expr: %v (%T)", t, t))
-			}
-		}
-		return true
-	case Ident:
-		// Ident matches everything
+	if argfmt.Wildcard != "" {
 		return true
 	}
-	panic(fmt.Errorf("Unexpected argument format type: %v (%T)", argfmt, argfmt))
+
+	binds := map[string]Expr{}
+	if len(argfmt.Args) != len(params) {
+		return false
+	}
+	for i, arg := range argfmt.Args {
+		param := params[i]
+		if !f.matchParam(&arg, &param) {
+			return false
+		}
+		if arg.Name == "" {
+			continue
+		}
+		if param.V == nil {
+			continue
+		}
+		if binded, ok := binds[arg.Name]; ok {
+			if !Equal(binded, param.V) {
+				return false
+			}
+		}
+		binds[arg.Name] = param.V
+	}
+	return true
+}
+
+func (f *FuncInterpret) matchParam(a *Arg, p *Param) bool {
+	if a.T == TypeUnknown && a.V == nil {
+		return true
+	}
+	if p.T == TypeUnknown && a.V == nil {
+		return true
+	}
+	if a.T == TypeAny && a.V == nil {
+		return true
+	}
+	if a.T != p.T && p.T != TypeUnknown && p.T != TypeAny {
+		canConvert, err := f.interpret.canConvertType(p.T, a.T)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v: %v\n", f.name, err)
+			return false
+		}
+		if !canConvert && p.T != TypeUnknown {
+			return false
+		}
+	}
+	if p.V == nil {
+		// not a real parameter, just a Type binder
+		return true
+	}
+	if a.V == nil {
+		// anything of this corresponding type matches
+		return true
+	}
+	return Equal(a.V, p.V)
 }
 
 func (f *FuncRuntime) cleanup() {
 	for _, varname := range f.scopedVars {
 		expr := f.vars[varname]
-		switch a := expr.(type) {
+		switch a := expr.V.(type) {
 		case Ident:
 			f.fi.interpret.DeleteLambda(string(a))
 		case io.Closer:
@@ -610,5 +723,5 @@ func (f *FuncRuntime) cleanup() {
 		}
 	}
 	f.scopedVars = f.scopedVars[:0]
-	f.vars = make(map[string]Expr)
+	f.vars = make(map[string]Param)
 }

@@ -144,6 +144,20 @@ func (p *Parser) prepareTokens() error {
 		if backslash {
 			token += `\` + string(r)
 			backslash = false
+		} else if inQuotes {
+			if r == '\\' {
+				backslash = true
+			} else {
+				token += string(r)
+				if r == '"' {
+					inQuotes = false
+					tokens = append(tokens, token)
+					token = ""
+				}
+			}
+		} else if r == '"' {
+			token += string(r)
+			inQuotes = true
 		} else if unicode.IsSpace(r) {
 			if inQuotes {
 				token += string(r)
@@ -168,17 +182,6 @@ func (p *Parser) prepareTokens() error {
 				token = ""
 			}
 			tokens = append(tokens, ")")
-		} else if r == '"' {
-			token += string(r)
-			if !inQuotes {
-				inQuotes = true
-			} else {
-				inQuotes = false
-				tokens = append(tokens, token)
-				token = ""
-			}
-		} else if inQuotes && r == '\\' {
-			backslash = true
 		} else {
 			token += string(r)
 		}

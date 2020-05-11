@@ -7,14 +7,14 @@ import (
 )
 
 func TestLazyList(t *testing.T) {
-	var ll List = NewLazyList(EvalerFunc(testCounter), Int64(0), false)
+	var ll List = NewLazyList(EvalerFunc("__func__", testCounter, AnyArgs, TypeList), &Param{V: Int64(0), T: TypeInt}, false)
 	res := make([]Expr, 0, 10)
 	for !ll.Empty() {
 		val, err := ll.Head()
 		if err != nil {
 			t.Fatalf("Head() failed: %v", err)
 		}
-		res = append(res, val)
+		res = append(res, val.V)
 		ll, err = ll.Tail()
 		if err != nil {
 			t.Fatalf("Tail() failed: %v", err)
@@ -38,26 +38,27 @@ func TestLazyList(t *testing.T) {
 }
 
 // 1..10 generator
-func testCounter(args []Expr) (Expr, error) {
-	prev := int64(args[0].(Int64))
+func testCounter(args []Param) (*Param, error) {
+	prev := int64(args[0].V.(Int64))
 	if prev >= 10 {
-		return QEmpty, nil
+		return &Param{V: QEmpty, T: TypeList}, nil
 	}
-	return &Sexpr{
+	s := &Sexpr{
 		List:   []Expr{Int64(prev + 1)},
 		Quoted: true,
-	}, nil
+	}
+	return &Param{V: s, T: TypeList}, nil
 }
 
 func TestLazyListState(t *testing.T) {
-	var ll List = NewLazyList(EvalerFunc(fibGen), QList(Int64(1), Int64(1)), false)
+	var ll List = NewLazyList(EvalerFunc("fibGen", fibGen, AnyArgs, TypeList), &Param{V: QList(Int64(1), Int64(1)), T: TypeList}, false)
 	res := make([]Expr, 0, 10)
 	for i := 0; i < 6; i++ {
 		val, err := ll.Head()
 		if err != nil {
 			t.Fatalf("Head() failed: %v", err)
 		}
-		res = append(res, val)
+		res = append(res, val.V)
 		ll, err = ll.Tail()
 		if err != nil {
 			t.Fatalf("Tail() failed: %v", err)
@@ -76,22 +77,23 @@ func TestLazyListState(t *testing.T) {
 	}
 }
 
-func fibGen(args []Expr) (Expr, error) {
-	state := args[0].(*Sexpr)
+func fibGen(args []Param) (*Param, error) {
+	state := args[0].V.(*Sexpr)
 	a := int64(state.List[0].(Int64))
 	b := int64(state.List[1].(Int64))
 	a, b = b, a+b
-	return &Sexpr{
+	s := &Sexpr{
 		List: []Expr{
 			Int64(a),
 			QList(Int64(a), Int64(b)),
 		},
 		Quoted: true,
-	}, nil
+	}
+	return &Param{V: s, T: TypeList}, nil
 }
 
 func TestLazyListFiniteString(t *testing.T) {
-	ll := NewLazyList(EvalerFunc(testCounter), Int64(0), false)
+	ll := NewLazyList(EvalerFunc("__func__", testCounter, AnyArgs, TypeAny), &Param{V: Int64(0), T: TypeInt}, false)
 	var buffer strings.Builder
 	ll.Print(&buffer)
 	act := buffer.String()

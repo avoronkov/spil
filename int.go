@@ -69,6 +69,10 @@ func (i Int64) Eq(a Int) bool {
 	return i == a.(Int64)
 }
 
+func (i Int64) Type() Type {
+	return TypeInt
+}
+
 type BigInt struct {
 	value *big.Int
 }
@@ -132,4 +136,8 @@ func (i *BigInt) Less(a Int) bool {
 
 func (i *BigInt) Eq(a Int) bool {
 	return i.value.Cmp(a.(*BigInt).value) == 0
+}
+
+func (i *BigInt) Type() Type {
+	return TypeInt
 }
