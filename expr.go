@@ -245,9 +245,9 @@ func (s *Sexpr) Type() Type {
 
 func Equal(a, b Expr) bool {
 	al, alist := a.(List)
-	bl, blist := b.(List)
-	if alist && blist && al.Empty() && bl.Empty() {
-		return true
+	if alist && al.Empty() {
+		bl, blist := b.(List)
+		return blist && bl.Empty()
 	}
 	if a.Type() != b.Type() {
 		return false
