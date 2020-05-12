@@ -347,3 +347,13 @@ You can find some examples of code [here](https://gitlab.com/avoronkov/spil/-/tr
 - [+] function "list"
 
 - restricted type casting and strict mode.
+
+- "length" and "nth" optimization for static listst.
+
+- Separate pragma parsing and loading std-lib first.
+
+- Functions overloading for user defined types
+
+- "error" and "catch" functions for runtime errors
+
+- Forbidden matching (:delete or something)
