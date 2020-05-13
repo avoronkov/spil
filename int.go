@@ -18,16 +18,29 @@ type Int interface {
 	Eq(Int) bool
 }
 
+type IntMaker interface {
+	ParseInt(token string) (Int, bool)
+	MakeInt(i int64) Int
+}
+
 type Int64 int64
 
 var _ Int = Int64(0)
 
-func ParseInt64(token string) (Int, bool) {
+type Int64Maker struct{}
+
+var _ IntMaker = Int64Maker{}
+
+func (i Int64Maker) ParseInt(token string) (Int, bool) {
 	n, err := strconv.ParseInt(token, 10, 64)
 	if err != nil {
 		return nil, false
 	}
 	return Int64(n), true
+}
+
+func (Int64Maker) MakeInt(i int64) Int {
+	return Int64(i)
 }
 
 func (i Int64) String() string {
@@ -79,13 +92,21 @@ type BigInt struct {
 
 var _ Int = (*BigInt)(nil)
 
-func ParseBigInt(token string) (Int, bool) {
+type BigIntMaker struct{}
+
+var _ IntMaker = BigIntMaker{}
+
+func (BigIntMaker) ParseInt(token string) (Int, bool) {
 	res := &big.Int{}
 	_, ok := res.SetString(token, 10)
 	if !ok {
 		return nil, false
 	}
 	return &BigInt{res}, true
+}
+
+func (BigIntMaker) MakeInt(i int64) Int {
+	return &BigInt{big.NewInt(i)}
 }
 
 func (i *BigInt) String() string {

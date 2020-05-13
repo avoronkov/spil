@@ -377,6 +377,10 @@ func FType(args []Param) (*Param, error) {
 	return &Param{V: Str(args[0].T), T: TypeStr}, nil
 }
 
+type Lenghter interface {
+	Length() int
+}
+
 // Binders
 func SingleArg(params []Param) error {
 	if len(params) != 1 {

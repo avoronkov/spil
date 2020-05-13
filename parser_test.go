@@ -34,11 +34,11 @@ func TestNextToken(t *testing.T) {
 				name += "-big"
 			}
 			t.Run(name, func(t *testing.T) {
-				parseInt := ParseInt64
+				var intMaker IntMaker = Int64Maker{}
 				if bigint {
-					parseInt = ParseBigInt
+					intMaker = BigIntMaker{}
 				}
-				p := NewParser(strings.NewReader(test.input), IntParserFn(parseInt))
+				p := NewParser(strings.NewReader(test.input), IntParserFn(intMaker.ParseInt))
 				var tokens []string
 				for {
 					tok, err := p.nextToken()
@@ -68,11 +68,11 @@ func TestNextExpr(t *testing.T) {
 	for _, test := range testdata {
 		name := test.input
 		t.Run(name, func(t *testing.T) {
-			parseInt := ParseInt64
+			var intMaker IntMaker = Int64Maker{}
 			if bigint {
-				parseInt = ParseBigInt
+				intMaker = BigIntMaker{}
 			}
-			p := NewParser(strings.NewReader(test.input), IntParserFn(parseInt))
+			p := NewParser(strings.NewReader(test.input), IntParserFn(intMaker.ParseInt))
 			res, err := p.NextExpr()
 			if err != nil {
 				t.Fatal(err)

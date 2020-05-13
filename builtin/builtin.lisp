@@ -108,6 +108,6 @@
 
 
 ;; length
-(def length (lst:list) :int (length lst 0))
-(def length ('() acc:int) :int acc)
-(def length (lst:list acc:int) :int (length (tail lst) (+ acc 1)))
+;; (def length (lst:list) :int (length lst 0))
+;; (def length ('() acc:int) :int acc)
+;; (def length (lst:list acc:int) :int (length (tail lst) (+ acc 1)))

@@ -83,7 +83,7 @@ func (f *FuncInterpret) TryBind(params []Param) (int, error) {
 			return idx, nil
 		}
 	}
-	return -1, fmt.Errorf("%v: no matching function implementaion found for %v", f.name, params)
+	return -1, fmt.Errorf("%v: no matching function implementation found for %v", f.name, params)
 }
 
 func (f *FuncInterpret) Eval(params []Param) (result *Param, err error) {
@@ -223,7 +223,7 @@ L:
 					// nothing to evaluate
 					return e, nil
 				}
-				if lst.Quoted || lst.Len() == 0 {
+				if lst.Quoted || lst.Length() == 0 {
 					p := &Param{V: lst, T: TypeList}
 					if forceType != nil {
 						p.T = *forceType
@@ -305,7 +305,7 @@ func (f *FuncRuntime) lastParameter(e Expr) (*Param, *Type, error) {
 		if a.Quoted {
 			return &Param{V: a, T: TypeList}, nil, nil
 		}
-		if a.Len() == 0 {
+		if a.Length() == 0 {
 			return nil, nil, fmt.Errorf("%v: Unexpected empty s-expression: %v", f.fi.name, a)
 		}
 		head, _ := a.Head()
@@ -475,7 +475,7 @@ func (f *FuncRuntime) evalParameter(expr Expr) (p *Param, err error) {
 		// nothing to evaluate
 		return e, nil
 	}
-	if lst.Quoted || lst.Len() == 0 {
+	if lst.Quoted || lst.Length() == 0 {
 		return e, nil
 	}
 	return f.evalFunc(lst)
@@ -483,7 +483,7 @@ func (f *FuncRuntime) evalParameter(expr Expr) (p *Param, err error) {
 
 // (var-name) (value)
 func (f *FuncRuntime) setVar(se *Sexpr, scoped bool) error {
-	if se.Len() != 2 && se.Len() != 3 {
+	if se.Length() != 2 && se.Length() != 3 {
 		return fmt.Errorf("set wants 2 or 3 arguments, found %v", se)
 	}
 	name, ok := se.List[0].(Ident)
@@ -494,7 +494,7 @@ func (f *FuncRuntime) setVar(se *Sexpr, scoped bool) error {
 	if err != nil {
 		return err
 	}
-	if se.Len() == 3 {
+	if se.Length() == 3 {
 		id, ok := se.List[2].(Ident)
 		if !ok {
 			return fmt.Errorf("%v: set expects type identifier, found: %v", f.fi.name, se.List[2])
@@ -514,7 +514,7 @@ func (f *FuncRuntime) setVar(se *Sexpr, scoped bool) error {
 
 // (iter) (init-state)
 func (f *FuncRuntime) evalGen(se *Sexpr, hashable bool) (Expr, error) {
-	if se.Len() != 2 {
+	if se.Length() != 2 {
 		return nil, fmt.Errorf("gen wants 2 argument, found %v", se)
 	}
 	fn, err := f.evalParameter(se.List[0])

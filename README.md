@@ -254,7 +254,7 @@ You can specify option "--check" (or "-c") for syntax and type checking of the p
 E.g. when you misplace the arguments in previous example (`(print (contains '(1 3 5 8) 4))`) you will get the following error:
 ```
 $ spil -c example.lisp
-__main__: contains: no matching function implementaion found for [{:list {S': {Int64: 1} {Int64: 3} {Int64: 5} {Int64: 8}}} {:int {Int64: 5}}]
+__main__: contains: no matching function implementation found for [{:list {S': {Int64: 1} {Int64: 3} {Int64: 5} {Int64: 8}}} {:int {Int64: 5}}]
 ```
 
 ## Type casting
@@ -357,3 +357,5 @@ You can find some examples of code [here](https://gitlab.com/avoronkov/spil/-/tr
 - "error" and "catch" functions for runtime errors
 
 - Forbidden matching (:delete or something)
+
+- Type of variable is vanished when placed into list.

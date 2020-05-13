@@ -16,7 +16,7 @@ type Interpret struct {
 
 	builtinDir string
 
-	parseInt func(token string) (Int, bool)
+	intMaker IntMaker
 
 	lambdaCount int
 
@@ -27,7 +27,7 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 	i := &Interpret{
 		output:     w,
 		builtinDir: builtinDir,
-		parseInt:   ParseInt64,
+		intMaker:   &Int64Maker{},
 	}
 	i.funcs = map[string]Evaler{
 		"+":      EvalerFunc("+", FPlus, i.AllInts, TypeInt),
@@ -49,6 +49,7 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 		"space":  EvalerFunc("space", FSpace, i.StrArg, TypeBool),
 		"eol":    EvalerFunc("eol", FEol, i.StrArg, TypeBool),
 		"empty":  EvalerFunc("empty", FEmpty, i.ListArg, TypeBool),
+		"length": EvalerFunc("length", i.FLength, i.ListArg, TypeInt),
 		"int":    EvalerFunc("int", i.FInt, i.StrArg, TypeInt),
 		"open":   EvalerFunc("open", FOpen, i.StrArg, TypeStr),
 		"type":   EvalerFunc("type", FType, SingleArg, TypeStr),
@@ -67,9 +68,9 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 
 func (i *Interpret) UseBigInt(v bool) {
 	if v {
-		i.parseInt = ParseBigInt
+		i.intMaker = &BigIntMaker{}
 	} else {
-		i.parseInt = ParseInt64
+		i.intMaker = &Int64Maker{}
 	}
 }
 
@@ -101,7 +102,7 @@ func (i *Interpret) loadBuiltin(dir string) error {
 }
 
 func (i *Interpret) ParseInt(token string) (Int, bool) {
-	return i.parseInt(token)
+	return i.intMaker.ParseInt(token)
 }
 
 func (i *Interpret) parse(input io.Reader) error {
@@ -120,7 +121,7 @@ L:
 			if a.Quoted {
 				return fmt.Errorf("Unexpected quoted s-expression: %v", a)
 			}
-			if a.Len() == 0 {
+			if a.Length() == 0 {
 				return fmt.Errorf("Unexpected empty s-expression on top-level: %v", a)
 			}
 			head, _ := a.Head()
@@ -188,7 +189,7 @@ func (i *Interpret) Run() error {
 
 // (func-name) args body...
 func (i *Interpret) defineFunc(se *Sexpr, memo bool) error {
-	if se.Len() < 3 {
+	if se.Length() < 3 {
 		return fmt.Errorf("Not enough arguments for function definition: %v", se)
 	}
 	name, ok := se.List[0].(Ident)
@@ -331,11 +332,36 @@ func (in *Interpret) FInt(args []Param) (*Param, error) {
 	if !ok {
 		return nil, fmt.Errorf("FInt: expected argument to be Str, found %v", args)
 	}
-	i, ok := in.parseInt(string(s))
+	i, ok := in.intMaker.ParseInt(string(s))
 	if !ok {
 		return nil, fmt.Errorf("FInt: cannot convert argument into Int: %v", s)
 	}
 	return &Param{V: i, T: TypeInt}, nil
+}
+
+func (in *Interpret) FLength(args []Param) (*Param, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("FLength: expected exaclty one argument, found %v", args)
+	}
+
+	if a, ok := args[0].V.(Lenghter); ok {
+		return &Param{V: in.intMaker.MakeInt(int64(a.Length())), T: TypeInt}, nil
+	}
+
+	a, ok := args[0].V.(List)
+	if !ok {
+		return nil, fmt.Errorf("FLength: expected argument to be List, found %v", args[0])
+	}
+	var l int64
+	for !a.Empty() {
+		l++
+		var err error
+		a, err = a.Tail()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &Param{V: in.intMaker.MakeInt(l), T: TypeInt}, nil
 }
 
 func (in *Interpret) NewLambdaName() (name string) {

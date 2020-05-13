@@ -200,15 +200,22 @@ func (s *Sexpr) Hash() (string, error) {
 	return b.String(), nil
 }
 
-func (s *Sexpr) Len() int {
+func (s *Sexpr) Length() int {
 	return len(s.List)
+}
+
+func (s *Sexpr) Nth(n int) (*Param, error) {
+	if n > len(s.List) {
+		return nil, fmt.Errorf("Index is out of range: %v", n)
+	}
+	return &Param{V: s.List[n-1], T: s.List[n-1].Type()}, nil
 }
 
 func (s *Sexpr) Head() (*Param, error) {
 	if len(s.List) == 0 {
 		return nil, fmt.Errorf("Cannot perform Head() on empty list")
 	}
-	return &Param{V: s.List[0], T: TypeAny}, nil
+	return &Param{V: s.List[0], T: s.List[0].Type()}, nil
 }
 
 func (s *Sexpr) Tail() (List, error) {
