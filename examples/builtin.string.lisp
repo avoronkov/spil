@@ -1,3 +1,5 @@
+(use std)
+
 ; Lazy read from file
 
 (set' file (open "examples/testdata.numbers.txt"))

@@ -162,12 +162,6 @@ func (i *Interpret) Parse(input io.Reader) error {
 	if err := i.parse(input); err != nil {
 		return err
 	}
-	// load builtin last
-	if i.builtinDir != "" {
-		if err := i.loadBuiltin(i.builtinDir); err != nil {
-			return err
-		}
-	}
 
 	i.main = NewFuncInterpret(i, "__main__")
 	if err := i.main.AddImpl(QList(Ident("__stdin")), i.mainBody, false, TypeAny); err != nil {
@@ -245,6 +239,10 @@ func (i *Interpret) use(args []Expr) error {
 		switch string(a) {
 		case "bigmath":
 			i.UseBigInt(true)
+		case "std":
+			if err := i.loadBuiltin(i.builtinDir); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("Unknown use-directive: %v", string(a))
 		}

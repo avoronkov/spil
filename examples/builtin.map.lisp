@@ -1,3 +1,5 @@
+(use std)
+
 ; map over simple may
 (set x2 (lambda (* _1 2)))
 (print (map x2 '(1 2 3 4 5)))
