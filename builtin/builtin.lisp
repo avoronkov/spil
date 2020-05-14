@@ -79,7 +79,8 @@
 
 ;; take nth element from list.
 ;; Elements numeration is started from 1 (!).
-(def nth (n:int lst:list) :any (head (drop (- n 1) lst)))
+; (def nth (n:int lst:list) :any (head (drop (- n 1) lst)))
+(def nth (n:int lst:list) :any (native.nth n lst))
 
 
 (def first  (lst:list) :any (nth 1 lst))
@@ -108,6 +109,7 @@
 
 
 ;; length
-;; (def length (lst:list) :int (length lst 0))
-;; (def length ('() acc:int) :int acc)
-;; (def length (lst:list acc:int) :int (length (tail lst) (+ acc 1)))
+(def length (lst:list) :int (native.length lst))
+; (def length (lst:list) :int (length lst 0))
+; (def length ('() acc:int) :int acc)
+; (def length (lst:list acc:int) :int (length (tail lst) (+ acc 1)))

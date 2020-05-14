@@ -30,29 +30,30 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 		intMaker:   &Int64Maker{},
 	}
 	i.funcs = map[string]Evaler{
-		"+":      EvalerFunc("+", FPlus, i.AllInts, TypeInt),
-		"-":      EvalerFunc("-", FMinus, i.AllInts, TypeInt),
-		"*":      EvalerFunc("*", FMultiply, i.AllInts, TypeInt),
-		"/":      EvalerFunc("/", FDiv, i.AllInts, TypeInt),
-		"mod":    EvalerFunc("mod", FMod, i.TwoInts, TypeInt),
-		"<":      EvalerFunc("<", FLess, i.TwoInts, TypeBool),
-		"<=":     EvalerFunc("<=", FLessEq, i.TwoInts, TypeBool),
-		">":      EvalerFunc(">", FMore, i.TwoInts, TypeBool),
-		">=":     EvalerFunc(">=", FMoreEq, i.TwoInts, TypeBool),
-		"=":      EvalerFunc("=", FEq, TwoArgs, TypeBool),
-		"not":    EvalerFunc("not", FNot, i.OneBoolArg, TypeBool),
-		"print":  EvalerFunc("print", i.FPrint, AnyArgs, TypeAny),
-		"head":   EvalerFunc("head", FHead, i.ListArg, TypeAny),
-		"tail":   EvalerFunc("tail", FTail, i.ListArg, TypeList),
-		"append": EvalerFunc("append", FAppend, i.AppenderArgs, TypeList),
-		"list":   EvalerFunc("list", FList, AnyArgs, TypeList),
-		"space":  EvalerFunc("space", FSpace, i.StrArg, TypeBool),
-		"eol":    EvalerFunc("eol", FEol, i.StrArg, TypeBool),
-		"empty":  EvalerFunc("empty", FEmpty, i.ListArg, TypeBool),
-		"length": EvalerFunc("length", i.FLength, i.ListArg, TypeInt),
-		"int":    EvalerFunc("int", i.FInt, i.StrArg, TypeInt),
-		"open":   EvalerFunc("open", FOpen, i.StrArg, TypeStr),
-		"type":   EvalerFunc("type", FType, SingleArg, TypeStr),
+		"+":             EvalerFunc("+", FPlus, i.AllInts, TypeInt),
+		"-":             EvalerFunc("-", FMinus, i.AllInts, TypeInt),
+		"*":             EvalerFunc("*", FMultiply, i.AllInts, TypeInt),
+		"/":             EvalerFunc("/", FDiv, i.AllInts, TypeInt),
+		"mod":           EvalerFunc("mod", FMod, i.TwoInts, TypeInt),
+		"<":             EvalerFunc("<", FLess, i.TwoInts, TypeBool),
+		"<=":            EvalerFunc("<=", FLessEq, i.TwoInts, TypeBool),
+		">":             EvalerFunc(">", FMore, i.TwoInts, TypeBool),
+		">=":            EvalerFunc(">=", FMoreEq, i.TwoInts, TypeBool),
+		"=":             EvalerFunc("=", FEq, TwoArgs, TypeBool),
+		"not":           EvalerFunc("not", FNot, i.OneBoolArg, TypeBool),
+		"print":         EvalerFunc("print", i.FPrint, AnyArgs, TypeAny),
+		"head":          EvalerFunc("head", FHead, i.ListArg, TypeAny),
+		"tail":          EvalerFunc("tail", FTail, i.ListArg, TypeList),
+		"append":        EvalerFunc("append", FAppend, i.AppenderArgs, TypeList),
+		"list":          EvalerFunc("list", FList, AnyArgs, TypeList),
+		"space":         EvalerFunc("space", FSpace, i.StrArg, TypeBool),
+		"eol":           EvalerFunc("eol", FEol, i.StrArg, TypeBool),
+		"empty":         EvalerFunc("empty", FEmpty, i.ListArg, TypeBool),
+		"native.length": EvalerFunc("native.length", i.FLength, i.ListArg, TypeInt),
+		"native.nth":    EvalerFunc("native.nth", i.FNth, i.IntAndListArgs, TypeAny),
+		"int":           EvalerFunc("int", i.FInt, i.StrArg, TypeInt),
+		"open":          EvalerFunc("open", FOpen, i.StrArg, TypeStr),
+		"type":          EvalerFunc("type", FType, SingleArg, TypeStr),
 	}
 	i.types = map[Type]Type{
 		TypeUnknown: "",
@@ -364,6 +365,37 @@ func (in *Interpret) FLength(args []Param) (*Param, error) {
 	return &Param{V: in.intMaker.MakeInt(l), T: TypeInt}, nil
 }
 
+func (in *Interpret) FNth(args []Param) (*Param, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("FNth: expected exaclty two arguments, found %v", args)
+	}
+	bign, ok := args[0].V.(Int)
+	if !ok {
+		return nil, fmt.Errorf("FNth: expected first argument to be Int, fount: %v", args[0])
+	}
+	n := int(bign.Int64())
+	if nther, ok := args[1].V.(Nther); ok {
+		return nther.Nth(n)
+	}
+	a, ok := args[1].V.(List)
+	if !ok {
+		return nil, fmt.Errorf("FNth: expected second argument to be List, found %v", args[1])
+	}
+	if n <= 0 {
+		return nil, fmt.Errorf("FNth: n should be >= 1, found: %v", n)
+	}
+	// numeration starts with 1
+	for n > 1 {
+		var err error
+		a, err = a.Tail()
+		if err != nil {
+			return nil, err
+		}
+		n--
+	}
+	return a.Head()
+}
+
 func (in *Interpret) NewLambdaName() (name string) {
 	name = fmt.Sprintf("__lambda__%03d", in.lambdaCount)
 	in.lambdaCount++
@@ -480,10 +512,6 @@ L:
 		}
 	}
 	return in.exprType(fname, body[len(body)-1], vars)
-}
-
-func (i *Interpret) evalParameter(fname, e Expr, vars map[string]Param) {
-
 }
 
 func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result Type, err error) {

@@ -381,6 +381,10 @@ type Lenghter interface {
 	Length() int
 }
 
+type Nther interface {
+	Nth(n int) (*Param, error)
+}
+
 // Binders
 func SingleArg(params []Param) error {
 	if len(params) != 1 {
@@ -490,6 +494,29 @@ func (in *Interpret) StrArg(params []Param) error {
 	}
 	if !ok && params[0].T != TypeUnknown {
 		return fmt.Errorf("expected argument to be Str, found %v", params)
+	}
+	return nil
+}
+
+func (in *Interpret) IntAndListArgs(params []Param) error {
+	if len(params) != 2 {
+		return fmt.Errorf("expected two arguments, found %v", params)
+	}
+
+	ok, err := in.canConvertType(params[0].T, TypeInt)
+	if err != nil {
+		return err
+	}
+	if !ok && params[0].T != TypeUnknown {
+		return fmt.Errorf("expected first argument to be Int, found %v", params)
+	}
+
+	ok, err = in.canConvertType(params[1].T, TypeList)
+	if err != nil {
+		return err
+	}
+	if !ok && params[1].T != TypeUnknown {
+		return fmt.Errorf("expected second argument to be List, found %v", params)
 	}
 	return nil
 }

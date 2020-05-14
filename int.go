@@ -16,6 +16,7 @@ type Int interface {
 	Mod(Int) Int
 	Less(Int) bool
 	Eq(Int) bool
+	Int64() int64
 }
 
 type IntMaker interface {
@@ -84,6 +85,10 @@ func (i Int64) Eq(a Int) bool {
 
 func (i Int64) Type() Type {
 	return TypeInt
+}
+
+func (i Int64) Int64() int64 {
+	return int64(i)
 }
 
 type BigInt struct {
@@ -161,4 +166,8 @@ func (i *BigInt) Eq(a Int) bool {
 
 func (i *BigInt) Type() Type {
 	return TypeInt
+}
+
+func (i *BigInt) Int64() int64 {
+	return i.value.Int64()
 }
