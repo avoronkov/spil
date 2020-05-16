@@ -687,7 +687,7 @@ func (f *FuncInterpret) matchParam(a *Arg, p *Param) bool {
 	if a.T == TypeAny && a.V == nil {
 		return true
 	}
-	if a.T != p.T && p.T != TypeUnknown && p.T != TypeAny {
+	if a.T != p.T && p.T != TypeUnknown {
 		canConvert, err := f.interpret.canConvertType(p.T, a.T)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v: %v\n", f.name, err)

@@ -97,14 +97,26 @@ func TestMatchArgs(t *testing.T) {
 			[]Param{Param{T: TypeUnknown, V: Int64(439)}},
 			false,
 		},
+		/*
+			{
+				MakeArgFmt(Arg{Name: "n", T: TypeInt, V: Int64(1)}),
+				[]Param{Param{T: TypeAny, V: Int64(1)}},
+				true,
+			},
+		*/
 		{
-			MakeArgFmt(Arg{Name: "n", T: TypeInt, V: Int64(1)}),
-			[]Param{Param{T: TypeAny, V: Int64(1)}},
+			MakeArgFmt(Arg{Name: "n", T: TypeList}),
+			[]Param{Param{T: Type(":set"), V: QEmpty}},
 			true,
 		},
 		{
 			MakeArgFmt(Arg{Name: "n", T: TypeList}),
-			[]Param{Param{T: Type(":set"), V: QEmpty}},
+			[]Param{Param{T: TypeAny}},
+			false,
+		},
+		{
+			MakeArgFmt(Arg{Name: "n", T: TypeAny}),
+			[]Param{Param{T: TypeList}},
 			true,
 		},
 	}
