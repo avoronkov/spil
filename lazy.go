@@ -9,7 +9,7 @@ var _ List = (*LazyList)(nil)
 
 type LazyList struct {
 	iter       Evaler
-	state      *Param
+	state      []Param
 	value      *Param
 	valueReady bool
 	tail       *LazyList
@@ -18,7 +18,7 @@ type LazyList struct {
 
 var lazyHashCount int64
 
-func NewLazyList(iter Evaler, state *Param, hashable bool) *LazyList {
+func NewLazyList(iter Evaler, state []Param, hashable bool) *LazyList {
 	l := &LazyList{
 		iter:       iter,
 		state:      state,
@@ -79,13 +79,10 @@ func (l *LazyList) Head() (*Param, error) {
 	// iter: value -> new-value
 	// iter: value -> '()  ; list finished
 	if !l.valueReady {
-		value, state, err := l.next()
+		err := l.next()
 		if err != nil {
 			return nil, err
 		}
-		l.valueReady = true
-		l.value = value
-		l.state = state
 	}
 	if l.value == nil {
 		return nil, fmt.Errorf("LazyList.Head(): list is empty")
@@ -93,43 +90,61 @@ func (l *LazyList) Head() (*Param, error) {
 	return l.value, nil
 }
 
-func (l *LazyList) next() (value *Param, state *Param, err error) {
-	args := []Param{*l.state}
-	returnType := l.iter.ReturnType()
-	expr, err := l.iter.Eval(args)
+func (l *LazyList) next() (err error) {
+	expr, err := l.iter.Eval(l.state)
 	if err != nil {
-		return nil, nil, fmt.Errorf("LazyList: Eval(%v) failed: %v", args, err)
+		return fmt.Errorf("LazyList: Eval(%v) failed: %v", l.state, err)
 	}
 	res, ok := expr.V.(*Sexpr)
 	if !ok {
-		return expr, expr, nil
+		l.valueReady = true
+		l.value = expr
+		l.state = []Param{*expr}
+		return nil
 	}
 	if len(res.List) == 0 {
 		// list is finished
-		return nil, nil, nil
+		l.valueReady = true
+		l.value = nil
+		l.state = nil
+		return nil
 	}
 	if len(res.List) == 1 {
 		// state = value
-		p := &Param{V: res.List[0], T: returnType}
-		return p, p, nil
+		l.valueReady = true
+		l.value = &Param{V: res.List[0], T: res.List[0].Type()}
+		l.state = []Param{{V: res.List[0], T: res.List[0].Type()}}
+		return nil
 	}
-	if len(res.List) != 2 {
-		return nil, nil, fmt.Errorf("Iterator result is too long: %v", res)
+	p1 := &Param{V: res.List[0], T: res.List[0].Type()}
+	tail, err := res.Tail()
+	if err != nil {
+		return err
 	}
-	p1 := &Param{V: res.List[0], T: returnType}
-	p2 := &Param{V: res.List[1], T: returnType}
-	return p1, p2, nil
+	var newState []Param
+	for !tail.Empty() {
+		p, err := tail.Head()
+		if err != nil {
+			return err
+		}
+		newState = append(newState, *p)
+		tail, err = tail.Tail()
+		if err != nil {
+			return err
+		}
+	}
+	l.valueReady = true
+	l.value = p1
+	l.state = newState
+	return nil
 }
 
 func (l *LazyList) Tail() (List, error) {
 	if !l.valueReady {
-		value, state, err := l.next()
+		err := l.next()
 		if err != nil {
 			return nil, err
 		}
-		l.valueReady = true
-		l.value = value
-		l.state = state
 	}
 	if l.value == nil {
 		return nil, fmt.Errorf("LazyList.Tail(): list is empty")
@@ -140,15 +155,12 @@ func (l *LazyList) Tail() (List, error) {
 	return l.tail, nil
 }
 
-func (l *LazyList) Empty() bool {
+func (l *LazyList) Empty() (result bool) {
 	if !l.valueReady {
-		value, state, err := l.next()
+		err := l.next()
 		if err != nil {
 			panic(err)
 		}
-		l.valueReady = true
-		l.value = value
-		l.state = state
 	}
 	return l.value == nil
 }

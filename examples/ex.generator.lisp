@@ -34,4 +34,10 @@
 (set ints4 (gen inc 0))
 (print (take 15 ints4))
 
+
+; iterator: state ... -> value, new-state ...
+(def next-fib (a b) (list b b (+ a b)))
+(set fibs (gen next-fib 1 1))
+(print (take 10 fibs))
+
 ; vim: ft=lisp

@@ -7,7 +7,7 @@ import (
 )
 
 func TestLazyList(t *testing.T) {
-	var ll List = NewLazyList(EvalerFunc("__func__", testCounter, AnyArgs, TypeList), &Param{V: Int64(0), T: TypeInt}, false)
+	var ll List = NewLazyList(EvalerFunc("__func__", testCounter, AnyArgs, TypeList), []Param{{V: Int64(0), T: TypeInt}}, false)
 	res := make([]Expr, 0, 10)
 	for !ll.Empty() {
 		val, err := ll.Head()
@@ -51,7 +51,7 @@ func testCounter(args []Param) (*Param, error) {
 }
 
 func TestLazyListState(t *testing.T) {
-	var ll List = NewLazyList(EvalerFunc("fibGen", fibGen, AnyArgs, TypeList), &Param{V: QList(Int64(1), Int64(1)), T: TypeList}, false)
+	var ll List = NewLazyList(EvalerFunc("fibGen", fibGen, AnyArgs, TypeList), []Param{{V: QList(Int64(1), Int64(1)), T: TypeList}}, false)
 	res := make([]Expr, 0, 10)
 	for i := 0; i < 6; i++ {
 		val, err := ll.Head()
@@ -93,7 +93,7 @@ func fibGen(args []Param) (*Param, error) {
 }
 
 func TestLazyListFiniteString(t *testing.T) {
-	ll := NewLazyList(EvalerFunc("__func__", testCounter, AnyArgs, TypeAny), &Param{V: Int64(0), T: TypeInt}, false)
+	ll := NewLazyList(EvalerFunc("__func__", testCounter, AnyArgs, TypeAny), []Param{{V: Int64(0), T: TypeInt}}, false)
 	var buffer strings.Builder
 	ll.Print(&buffer)
 	act := buffer.String()

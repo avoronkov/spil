@@ -137,7 +137,7 @@ func makeEmptyGen() List {
 	gen := func(args []Param) (*Param, error) {
 		return &Param{V: QEmpty, T: TypeList}, nil
 	}
-	return NewLazyList(EvalerFunc("__gen__", gen, AnyArgs, TypeAny), &Param{V: QEmpty, T: TypeList}, false)
+	return NewLazyList(EvalerFunc("__gen__", gen, AnyArgs, TypeAny), []Param{{V: QEmpty, T: TypeList}}, false)
 }
 
 func TestCanConvertType(t *testing.T) {

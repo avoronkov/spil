@@ -514,8 +514,8 @@ func (f *FuncRuntime) setVar(se *Sexpr, scoped bool) error {
 
 // (iter) (init-state)
 func (f *FuncRuntime) evalGen(se *Sexpr, hashable bool) (Expr, error) {
-	if se.Length() != 2 {
-		return nil, fmt.Errorf("gen wants 2 argument, found %v", se)
+	if se.Length() < 2 {
+		return nil, fmt.Errorf("gen wants at least 2 arguments, found %v", se)
 	}
 	fn, err := f.evalParameter(se.List[0])
 	if err != nil {
@@ -529,9 +529,13 @@ func (f *FuncRuntime) evalGen(se *Sexpr, hashable bool) (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	state, err := f.evalParameter(se.List[1])
-	if err != nil {
-		return nil, err
+	var state []Param
+	for _, a := range se.List[1:] {
+		s, err := f.evalParameter(a)
+		if err != nil {
+			return nil, err
+		}
+		state = append(state, *s)
 	}
 	return NewLazyList(fu, state, hashable), nil
 }
@@ -686,6 +690,10 @@ func (f *FuncInterpret) matchParam(a *Arg, p *Param) bool {
 	}
 	if a.T == TypeAny && a.V == nil {
 		return true
+	}
+	if l, ok := a.V.(List); ok && l.Empty() {
+		pl, ok := p.V.(List)
+		return ok && pl.Empty()
 	}
 	if a.T != p.T && p.T != TypeUnknown {
 		canConvert, err := f.interpret.canConvertType(p.T, a.T)
