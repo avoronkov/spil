@@ -14,6 +14,9 @@ type Interpret struct {
 	types    map[Type]Type
 	mainBody []Expr
 
+	// string->filepath map to control where function was initially defined.
+	funcsOrigins map[string]string
+
 	builtinDir string
 
 	intMaker IntMaker
@@ -25,9 +28,10 @@ type Interpret struct {
 
 func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 	i := &Interpret{
-		output:     w,
-		builtinDir: builtinDir,
-		intMaker:   &Int64Maker{},
+		output:       w,
+		builtinDir:   builtinDir,
+		intMaker:     &Int64Maker{},
+		funcsOrigins: make(map[string]string),
 	}
 	i.funcs = map[string]Evaler{
 		"+":             EvalerFunc("+", FPlus, i.AllInts, TypeInt),
@@ -90,7 +94,12 @@ func (i *Interpret) loadBuiltin(dir string) error {
 				return err
 			}
 			defer f.Close()
-			if err := i.parse(f); err != nil {
+			absPath, err := filepath.Abs(file)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Cannot determine absolute path for %q: %e", file, err)
+				absPath = file
+			}
+			if err := i.parse(absPath, f); err != nil {
 				return err
 			}
 			return nil
@@ -106,7 +115,7 @@ func (i *Interpret) ParseInt(token string) (Int, bool) {
 	return i.intMaker.ParseInt(token)
 }
 
-func (i *Interpret) parse(input io.Reader) error {
+func (i *Interpret) parse(file string, input io.Reader) error {
 	parser := NewParser(input, i)
 L:
 	for {
@@ -134,7 +143,7 @@ L:
 						memo = true
 					}
 					tail, _ := a.Tail()
-					if err := i.defineFunc(tail.(*Sexpr), memo); err != nil {
+					if err := i.defineFunc(file, tail.(*Sexpr), memo); err != nil {
 						return err
 					}
 					continue L
@@ -158,8 +167,8 @@ L:
 	return nil
 }
 
-func (i *Interpret) Parse(input io.Reader) error {
-	if err := i.parse(input); err != nil {
+func (i *Interpret) Parse(file string, input io.Reader) error {
+	if err := i.parse(file, input); err != nil {
 		return err
 	}
 
@@ -183,7 +192,7 @@ func (i *Interpret) Run() error {
 }
 
 // (func-name) args body...
-func (i *Interpret) defineFunc(se *Sexpr, memo bool) error {
+func (i *Interpret) defineFunc(file string, se *Sexpr, memo bool) error {
 	if se.Length() < 3 {
 		return fmt.Errorf("Not enough arguments for function definition: %v", se)
 	}
@@ -193,6 +202,9 @@ func (i *Interpret) defineFunc(se *Sexpr, memo bool) error {
 	}
 
 	fname := string(name)
+	if f1, ok := i.funcsOrigins[fname]; ok && f1 != file {
+		return fmt.Errorf("cannot define function '%v' in file %v: it is already defined in %v", fname, file, f1)
+	}
 	var fi *FuncInterpret
 
 	evaler, ok := i.funcs[fname]
@@ -219,7 +231,11 @@ func (i *Interpret) defineFunc(se *Sexpr, memo bool) error {
 		}
 	}
 	// TODO
-	return fi.AddImpl(se.List[1], se.List[2:], memo, returnType)
+	if err := fi.AddImpl(se.List[1], se.List[2:], memo, returnType); err != nil {
+		return err
+	}
+	i.funcsOrigins[fname] = file
+	return nil
 }
 
 func (i *Interpret) use(args []Expr) error {
@@ -234,7 +250,12 @@ func (i *Interpret) use(args []Expr) error {
 			return err
 		}
 		defer f.Close()
-		return i.parse(f)
+		fpath, err := filepath.Abs(string(a))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Cannot detect absolute path for %v: %v\n", string(a), err)
+			fpath = string(a)
+		}
+		return i.parse(fpath, f)
 	case Ident:
 		switch string(a) {
 		case "bigmath":

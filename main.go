@@ -47,20 +47,28 @@ func doMain() int {
 	in := NewInterpreter(os.Stdout, builtinDir)
 	in.UseBigInt(bigint)
 
+	var file string
 	var input io.Reader
 	if len(flag.Args()) >= 1 {
-		f, err := os.Open(flag.Arg(0))
+		fname := flag.Arg(0)
+		f, err := os.Open(fname)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			return 1
 		}
 		defer f.Close()
 		input = f
+		file, err = filepath.Abs(fname)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Cannot determine absolute path for %q: %e", file, err)
+			file = fname
+		}
 	} else {
 		input = os.Stdin
+		file = "__stdin__"
 	}
 
-	if err := in.Parse(input); err != nil {
+	if err := in.Parse(file, input); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return 1
 	}

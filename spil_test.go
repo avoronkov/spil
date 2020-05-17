@@ -74,7 +74,11 @@ func checkInterpreter(t *testing.T, input, output string, builtin, bigint bool) 
 	in := NewInterpreter(buffer, builtinDir)
 	in.UseBigInt(bigint)
 
-	if err := run(in, fin); err != nil {
+	inputPath, err := filepath.Abs(input)
+	if err != nil {
+		t.Fatalf("Abs(%v) failed: %v", input, err)
+	}
+	if err := run(in, inputPath, fin); err != nil {
 		t.Fatalf("Interpreter Run() failed: %v", err)
 	}
 
@@ -83,8 +87,8 @@ func checkInterpreter(t *testing.T, input, output string, builtin, bigint bool) 
 	}
 }
 
-func run(i *Interpret, input io.Reader) error {
-	if err := i.Parse(input); err != nil {
+func run(i *Interpret, file string, input io.Reader) error {
+	if err := i.Parse(file, input); err != nil {
 		return err
 	}
 	if err := i.Check(); err != nil {
