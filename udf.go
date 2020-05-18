@@ -12,10 +12,11 @@ import (
 // User-defined functions
 
 type FuncInterpret struct {
-	interpret  *Interpret
-	name       string
-	bodies     []*FuncImpl
-	returnType Type
+	interpret    *Interpret
+	name         string
+	bodies       []*FuncImpl
+	returnType   Type
+	capturedVars map[string]*Param
 }
 
 type FuncImpl struct {
@@ -53,9 +54,10 @@ func (i *FuncImpl) RememberResult(name string, args []Expr, result *Param) {
 
 func NewFuncInterpret(i *Interpret, name string) *FuncInterpret {
 	return &FuncInterpret{
-		interpret:  i,
-		name:       name,
-		returnType: TypeUnknown,
+		interpret:    i,
+		name:         name,
+		returnType:   TypeUnknown,
+		capturedVars: make(map[string]*Param),
 	}
 }
 
@@ -75,6 +77,10 @@ func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr, memo bool, returnType 
 
 	f.returnType = returnType
 	return nil
+}
+
+func (f *FuncInterpret) AddVar(name string, p *Param) {
+	f.capturedVars[name] = p
 }
 
 func (f *FuncInterpret) TryBind(params []Param) (int, error) {
@@ -297,8 +303,8 @@ func (f *FuncRuntime) lastParameter(e Expr) (*Param, *Type, error) {
 	case Bool:
 		return &Param{V: a, T: TypeBool}, nil, nil
 	case Ident:
-		if value, ok := f.vars[string(a)]; ok {
-			return &value, nil, nil
+		if value, ok := f.findVar(string(a)); ok {
+			return value, nil, nil
 		}
 		return &Param{V: a, T: TypeUnknown}, nil, nil
 	case *Sexpr:
@@ -512,6 +518,15 @@ func (f *FuncRuntime) setVar(se *Sexpr, scoped bool) error {
 	return nil
 }
 
+func (f *FuncRuntime) findVar(name string) (*Param, bool) {
+	if p, ok := f.vars[name]; ok {
+		return &p, true
+	} else if p, ok := f.fi.capturedVars[name]; ok {
+		return p, true
+	}
+	return nil, false
+}
+
 // (iter) (init-state)
 func (f *FuncRuntime) evalGen(se *Sexpr, hashable bool) (Expr, error) {
 	if se.Length() < 2 {
@@ -540,9 +555,9 @@ func (f *FuncRuntime) evalGen(se *Sexpr, hashable bool) (Expr, error) {
 	return NewLazyList(fu, state, hashable), nil
 }
 
-func (f *FuncRuntime) findFunc(fname string) (Evaler, error) {
+func (f *FuncRuntime) findFunc(fname string) (result Evaler, err error) {
 	// Ability to pass function name as argument
-	if v, ok := f.vars[fname]; ok {
+	if v, ok := f.findVar(fname); ok {
 		if v.T != TypeFunc && v.T != TypeUnknown {
 			return nil, fmt.Errorf("%v: incorrect type of '%v', expected :func, found: %v", f.fi.name, fname, v)
 		}
@@ -560,7 +575,7 @@ func (f *FuncRuntime) findFunc(fname string) (Evaler, error) {
 }
 
 // (func-name) (args...)
-func (f *FuncRuntime) evalFunc(se *Sexpr) (*Param, error) {
+func (f *FuncRuntime) evalFunc(se *Sexpr) (result *Param, err error) {
 	head, err := se.Head()
 	if err != nil {
 		return nil, err
@@ -586,14 +601,14 @@ func (f *FuncRuntime) evalFunc(se *Sexpr) (*Param, error) {
 		}
 		args = append(args, *res)
 	}
-	result, err := fu.Eval(args)
+	result, err = fu.Eval(args)
 	return result, err
 }
 
 func (f *FuncRuntime) evalLambda(se *Sexpr) (Expr, error) {
 	name := f.fi.interpret.NewLambdaName()
 	fi := NewFuncInterpret(f.fi.interpret, name)
-	body := f.replaceVars(se.List)
+	body := f.replaceVars(se.List, fi)
 	fi.AddImpl(nil, body, false, TypeAny)
 	f.fi.interpret.funcs[name] = fi
 	return Ident(name), nil
@@ -601,18 +616,19 @@ func (f *FuncRuntime) evalLambda(se *Sexpr) (Expr, error) {
 
 var lambdaArgRe = regexp.MustCompile(`^(_[0-9]+|__args)$`)
 
-func (f *FuncRuntime) replaceVars(st []Expr) (res []Expr) {
+func (f *FuncRuntime) replaceVars(st []Expr, fi *FuncInterpret) (res []Expr) {
 	for _, s := range st {
 		switch a := s.(type) {
 		case *Sexpr:
 			v := &Sexpr{Quoted: a.Quoted}
-			v.List = f.replaceVars(a.List)
+			v.List = f.replaceVars(a.List, fi)
 			res = append(res, v)
 		case Ident:
 			if lambdaArgRe.MatchString(string(a)) {
 				res = append(res, a)
-			} else if v, ok := f.vars[string(a)]; ok {
-				res = append(res, v.V)
+			} else if v, ok := f.findVar(string(a)); ok {
+				fi.AddVar(string(a), v)
+				res = append(res, a)
 			} else {
 				res = append(res, a)
 			}
