@@ -23,6 +23,8 @@ type Interpret struct {
 
 	lambdaCount int
 
+	strictTypes bool
+
 	main *FuncInterpret
 }
 
@@ -180,7 +182,7 @@ func (i *Interpret) Parse(file string, input io.Reader) error {
 }
 
 // type-checking
-func (i *Interpret) Check() error {
+func (i *Interpret) Check() []error {
 	return i.CheckReturnTypes()
 
 }
@@ -264,6 +266,8 @@ func (i *Interpret) use(args []Expr) error {
 			if err := i.loadBuiltin(i.builtinDir); err != nil {
 				return err
 			}
+		case "strict":
+			i.strictTypes = true
 		default:
 			return fmt.Errorf("Unknown use-directive: %v", string(a))
 		}
@@ -437,13 +441,13 @@ func (in *Interpret) Stat() {
 	}
 }
 
-func (i *Interpret) CheckReturnTypes() error {
+func (i *Interpret) CheckReturnTypes() (errs []error) {
 	mainArgs := map[string]Type{
 		"__stdin": TypeStr,
 	}
 	_, err := i.evalBodyType("__main__", i.mainBody, mainArgs)
 	if err != nil {
-		return err
+		errs = append(errs, err)
 	}
 	for _, fn := range i.funcs {
 		fi, ok := fn.(*FuncInterpret)
@@ -453,18 +457,33 @@ func (i *Interpret) CheckReturnTypes() error {
 		}
 
 		for _, impl := range fi.bodies {
+			if i.strictTypes {
+				if fi.returnType == TypeUnknown {
+					err := fmt.Errorf("%v : %v: return type should be specified in strict mode", i.funcsOrigins[fi.name], fi.name)
+					errs = append(errs, err)
+				}
+				if impl.argfmt.Wildcard == "" {
+					for _, a := range impl.argfmt.Args {
+						if a.T == TypeUnknown {
+							err := fmt.Errorf("%v : %v: arument type should be specified in strict mode: %v", i.funcsOrigins[fi.name], fi.name, a.Name)
+							errs = append(errs, err)
+						}
+					}
+				}
+			}
 			t, err := i.evalBodyType(fi.name, impl.body, impl.argfmt.Values())
 			if err != nil {
-				return err
+				errs = append(errs, err)
 			}
 			if fi.returnType != TypeAny && fi.returnType != TypeUnknown {
 				if t != fi.returnType {
-					return fmt.Errorf("Incorrect return value in function %v(%v): expected %v actual %v", fi.name, impl.argfmt, fi.returnType, t)
+					err := fmt.Errorf("Incorrect return value in function %v(%v): expected %v actual %v", fi.name, impl.argfmt, fi.returnType, t)
+					errs = append(errs, err)
 				}
 			}
 		}
 	}
-	return nil
+	return
 }
 
 func (in *Interpret) evalBodyType(fname string, body []Expr, vars map[string]Type) (rt Type, err error) {

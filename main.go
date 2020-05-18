@@ -73,8 +73,10 @@ func doMain() int {
 		return 1
 	}
 
-	if err := in.Check(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+	if errs := in.Check(); len(errs) > 0 {
+		for _, err := range errs {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+		}
 		return 1
 	}
 

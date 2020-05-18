@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -92,7 +93,7 @@ func run(i *Interpret, file string, input io.Reader) error {
 		return err
 	}
 	if err := i.Check(); err != nil {
-		return err
+		return fmt.Errorf("Check failed: %v", err)
 	}
 	return i.Run()
 }
