@@ -388,14 +388,14 @@ type Nther interface {
 // Binders
 func SingleArg(params []Param) error {
 	if len(params) != 1 {
-		return fmt.Errorf("FOpen: expected exaclty one argument, found %v", params)
+		return fmt.Errorf("expected exaclty one argument, found %v", params)
 	}
 	return nil
 }
 
 func (in *Interpret) AllInts(params []Param) error {
 	for i, p := range params {
-		if p.T == TypeUnknown {
+		if p.T == TypeUnknown || p.T.Generic() {
 			continue
 		}
 		ok, err := in.canConvertType(p.T, TypeInt)
@@ -431,7 +431,7 @@ func (in *Interpret) OneBoolArg(params []Param) error {
 	if err != nil {
 		return err
 	}
-	if !ok && params[0].T != TypeUnknown {
+	if !ok && params[0].T != TypeUnknown && !params[0].T.Generic() {
 		return fmt.Errorf("expected argument to be Bool, found %v", params[0])
 	}
 	return nil
@@ -454,7 +454,7 @@ func (in *Interpret) ListArg(params []Param) error {
 		return nil
 	}
 
-	if params[0].T != TypeList && params[0].T != TypeStr && params[0].T != TypeUnknown {
+	if params[0].T != TypeList && params[0].T != TypeStr && params[0].T != TypeUnknown && !params[0].T.Generic() {
 		return fmt.Errorf("expected argument to be List, found %v", params[0])
 	}
 	return nil
@@ -478,7 +478,7 @@ func (in *Interpret) AppenderArgs(params []Param) error {
 	if ok {
 		return nil
 	}
-	if params[0].T != TypeUnknown {
+	if params[0].T != TypeUnknown && !params[0].T.Generic() {
 		return fmt.Errorf("FAppend: expected first argument to be Appender, found %v", params[0])
 	}
 	return nil
@@ -492,7 +492,7 @@ func (in *Interpret) StrArg(params []Param) error {
 	if err != nil {
 		return err
 	}
-	if !ok && params[0].T != TypeUnknown {
+	if !ok && params[0].T != TypeUnknown && !params[0].T.Generic() {
 		return fmt.Errorf("expected argument to be Str, found %v", params)
 	}
 	return nil
@@ -507,7 +507,7 @@ func (in *Interpret) IntAndListArgs(params []Param) error {
 	if err != nil {
 		return err
 	}
-	if !ok && params[0].T != TypeUnknown {
+	if !ok && params[0].T != TypeUnknown && !params[0].T.Generic() {
 		return fmt.Errorf("expected first argument to be Int, found %v", params)
 	}
 
@@ -515,7 +515,7 @@ func (in *Interpret) IntAndListArgs(params []Param) error {
 	if err != nil {
 		return err
 	}
-	if !ok && params[1].T != TypeUnknown {
+	if !ok && params[1].T != TypeUnknown && !params[1].T.Generic() {
 		return fmt.Errorf("expected second argument to be List, found %v", params)
 	}
 	return nil

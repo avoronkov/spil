@@ -93,6 +93,21 @@ func (f *FuncInterpret) TryBind(params []Param) (int, Type, error) {
 			if newT, ok := types[t]; ok {
 				t = newT
 			}
+			if len(types) > 0 {
+				// check that generics are matching
+				values := map[string]Type{}
+				for i, arg := range im.argfmt.Args {
+					values[arg.Name] = params[i].T
+				}
+				tt, err := f.interpret.evalBodyType(f.name, im.body, values)
+
+				if err != nil {
+					return -1, "", err
+				}
+				if t != tt {
+					return -1, "", fmt.Errorf("%v: mismatch return type: %v != %v", f.name, t, tt)
+				}
+			}
 			// TODO
 			return idx, t, nil
 		}
