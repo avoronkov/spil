@@ -119,13 +119,23 @@ func TestMatchArgs(t *testing.T) {
 			[]Param{Param{T: TypeList}},
 			true,
 		},
+		{
+			MakeArgFmt(Arg{Name: "a", T: ":a"}, Arg{Name: "b", T: ":a"}),
+			[]Param{{T: TypeInt}, {T: TypeInt}},
+			true,
+		},
+		{
+			MakeArgFmt(Arg{Name: "a", T: ":a"}, Arg{Name: "b", T: ":a"}),
+			[]Param{Param{T: TypeInt}, Param{T: TypeStr}},
+			false,
+		},
 	}
 	in := NewInterpreter(os.Stderr, "")
 	fi := NewFuncInterpret(in, "__test__")
 	in.types[Type(":set")] = TypeList
 	for i, test := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
-			act := fi.matchParameters(test.argfmt, test.args)
+			act, _ := fi.matchParameters(test.argfmt, test.args)
 			if act != test.exp {
 				t.Errorf("Incorrect matchArgs(%v, %v) != %v", test.argfmt, test.args, test.exp)
 			}

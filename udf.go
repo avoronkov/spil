@@ -26,13 +26,16 @@ type FuncImpl struct {
 	memo bool
 	// Function results: args.Repr() -> Result
 	results map[string]*Param
+	// return type
+	returnType Type
 }
 
-func NewFuncImpl(argfmt *ArgFmt, body []Expr, memo bool) *FuncImpl {
+func NewFuncImpl(argfmt *ArgFmt, body []Expr, memo bool, returnType Type) *FuncImpl {
 	i := &FuncImpl{
-		argfmt: argfmt,
-		body:   body,
-		memo:   memo,
+		argfmt:     argfmt,
+		body:       body,
+		memo:       memo,
+		returnType: returnType,
 	}
 	if memo {
 		i.results = make(map[string]*Param)
@@ -66,14 +69,14 @@ func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr, memo bool, returnType 
 		return fmt.Errorf("%v: cannot redefine return type: previous %v, current %v", f.name, f.returnType, returnType)
 	}
 	if argfmt == nil {
-		f.bodies = append(f.bodies, NewFuncImpl(nil, body, memo))
+		f.bodies = append(f.bodies, NewFuncImpl(nil, body, memo, returnType))
 		return nil
 	}
 	af, err := ParseArgFmt(argfmt)
 	if err != nil {
 		return err
 	}
-	f.bodies = append(f.bodies, NewFuncImpl(af, body, memo))
+	f.bodies = append(f.bodies, NewFuncImpl(af, body, memo, returnType))
 
 	f.returnType = returnType
 	return nil
@@ -83,13 +86,18 @@ func (f *FuncInterpret) AddVar(name string, p *Param) {
 	f.capturedVars[name] = p
 }
 
-func (f *FuncInterpret) TryBind(params []Param) (int, error) {
+func (f *FuncInterpret) TryBind(params []Param) (int, Type, error) {
 	for idx, im := range f.bodies {
-		if f.matchParameters(im.argfmt, params) {
-			return idx, nil
+		if ok, types := f.matchParameters(im.argfmt, params); ok {
+			t := im.returnType
+			if newT, ok := types[t]; ok {
+				t = newT
+			}
+			// TODO
+			return idx, t, nil
 		}
 	}
-	return -1, fmt.Errorf("%v: no matching function implementation found for %v", f.name, params)
+	return -1, TypeUnknown, fmt.Errorf("%v: no matching function implementation found for %v", f.name, params)
 }
 
 func (f *FuncInterpret) Eval(params []Param) (result *Param, err error) {
@@ -146,7 +154,7 @@ func (f *FuncRuntime) bind(params []Param) (impl *FuncImpl, result *Param, err e
 	for _, p := range params {
 		args = append(args, p.V)
 	}
-	idx, err := f.fi.TryBind(params)
+	idx, _, err := f.fi.TryBind(params)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -663,23 +671,31 @@ func (f *FuncRuntime) evalApply(se *Sexpr) (Expr, error) {
 	}, nil
 }
 
-func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []Param) (result bool) {
+func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []Param) (result bool, types map[Type]Type) {
 	if argfmt == nil {
 		// null matches everything (lambda case)
-		return true
+		return true, nil
 	}
 	if argfmt.Wildcard != "" {
-		return true
+		return true, nil
 	}
 
 	binds := map[string]Expr{}
+	typeBinds := map[Type]Type{}
 	if len(argfmt.Args) != len(params) {
-		return false
+		return false, nil
 	}
 	for i, arg := range argfmt.Args {
 		param := params[i]
 		if !f.matchParam(&arg, &param) {
-			return false
+			return false, nil
+		}
+		if arg.T.Generic() {
+			if binded, ok := typeBinds[arg.T]; ok && binded != param.T {
+				fmt.Fprintf(os.Stderr, "Generic type %v is already binded to %v: cannot match %v\n", arg.T, binded, param.T)
+				return false, nil
+			}
+			typeBinds[arg.T] = param.T
 		}
 		if arg.Name == "" {
 			continue
@@ -689,15 +705,18 @@ func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []Param) (result 
 		}
 		if binded, ok := binds[arg.Name]; ok {
 			if !Equal(binded, param.V) {
-				return false
+				return false, nil
 			}
 		}
 		binds[arg.Name] = param.V
 	}
-	return true
+	return true, typeBinds
 }
 
 func (f *FuncInterpret) matchParam(a *Arg, p *Param) bool {
+	if a.T.Generic() {
+		return true
+	}
 	if a.T == TypeUnknown && a.V == nil {
 		return true
 	}

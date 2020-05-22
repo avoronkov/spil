@@ -9,7 +9,7 @@ import (
 type Evaler interface {
 	Eval([]Param) (*Param, error)
 	ReturnType() Type
-	TryBind(params []Param) (int, error)
+	TryBind(params []Param) (int, Type, error)
 }
 
 type nativeFunc struct {
@@ -27,11 +27,11 @@ func (n *nativeFunc) ReturnType() Type {
 	return n.ret
 }
 
-func (n *nativeFunc) TryBind(params []Param) (int, error) {
+func (n *nativeFunc) TryBind(params []Param) (int, Type, error) {
 	if err := n.binder(params); err != nil {
-		return -1, fmt.Errorf("%v: %v", n.name, err)
+		return -1, TypeUnknown, fmt.Errorf("%v: %v", n.name, err)
 	}
-	return 0, nil
+	return 0, n.ret, nil
 }
 
 func EvalerFunc(name string, fn func([]Param) (*Param, error), binder func([]Param) error, ret Type) Evaler {

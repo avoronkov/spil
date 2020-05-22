@@ -70,6 +70,9 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 		TypeFunc:    TypeAny,
 		TypeList:    TypeAny,
 	}
+	for c := 'a'; c <= 'z'; c++ {
+		i.types[Type(fmt.Sprintf(":%c", c))] = ""
+	}
 	return i
 }
 
@@ -311,7 +314,7 @@ func (in *Interpret) defineType(args []Expr) error {
 
 func (in *Interpret) canConvertType(from, to Type) (bool, error) {
 	if _, ok := in.types[to]; !ok {
-		return false, fmt.Errorf("Type %v is not defined", to)
+		return false, fmt.Errorf("Cannot convert type %v into %v: %v is not defined", from, to, to)
 	}
 	if from == to {
 		return true, nil
@@ -319,7 +322,7 @@ func (in *Interpret) canConvertType(from, to Type) (bool, error) {
 	for {
 		parent, ok := in.types[from]
 		if !ok {
-			return false, fmt.Errorf("Type %v is not defined", from)
+			return false, fmt.Errorf("Cannot convert type %v into %v: %v is not defined", from, to, from)
 		}
 		if parent == to {
 			return true, nil
@@ -688,12 +691,12 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 					panic(fmt.Errorf("%v: unexpected type: %v", fname, item))
 				}
 			}
-			_, err := f.TryBind(params)
+			_, t, err := f.TryBind(params)
 			if err != nil {
 				return u, fmt.Errorf("%v: %v", fname, err)
 			}
 
-			return f.ReturnType(), nil
+			return t, nil
 		}
 	}
 	fmt.Fprintf(os.Stderr, "Unexpected return. (TypeAny)\n")
@@ -703,7 +706,7 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 func (in *Interpret) parseType(token string) (Type, error) {
 	_, ok := in.types[Type(token)]
 	if !ok {
-		return "", fmt.Errorf("type %v is not defined", token)
+		return "", fmt.Errorf("Cannot parse type %v: not defined", token)
 	}
 	return Type(token), nil
 }

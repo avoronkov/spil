@@ -21,6 +21,10 @@ func (t Type) String() string {
 	return string(t)
 }
 
+func (t Type) Generic() bool {
+	return len(strings.TrimLeft(string(t), ":")) == 1
+}
+
 func ParseType(token string) (Type, bool) {
 	if strings.HasPrefix(token, ":") {
 		return Type(token), true
