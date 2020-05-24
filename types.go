@@ -25,6 +25,42 @@ func (t Type) Generic() bool {
 	return len(strings.TrimLeft(string(t), ":")) == 1
 }
 
+// ":list[a]" -> "list"
+func (t Type) Basic() string {
+	res := strings.TrimLeft(string(t), ":")
+	if p := strings.Index(res, "["); p >= 0 {
+		res = res[:p]
+	}
+	return res
+}
+
+// ":tuple[a,b,c]" -> ["a", "b", "c"]
+func (t Type) Arguments() []string {
+	l := strings.Index(string(t), "[")
+	if l < 0 {
+		return nil
+	}
+	s := strings.TrimRight(string(t)[l+1:], "]")
+	return strings.Split(s, ",")
+}
+
+// ":x[int,str,list]" -> "x[a,b,c]"
+func (t Type) Canonical() Type {
+	res := ":" + t.Basic()
+	args := t.Arguments()
+	if len(args) > 0 {
+		res += "["
+		for i := range args {
+			if i > 0 {
+				res += ","
+			}
+			res += string('a' + i)
+		}
+		res += "]"
+	}
+	return Type(res)
+}
+
 func ParseType(token string) (Type, bool) {
 	if strings.HasPrefix(token, ":") {
 		return Type(token), true

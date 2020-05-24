@@ -3,16 +3,18 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
 type Interpret struct {
-	output   io.Writer
-	funcs    map[string]Evaler
-	types    map[Type]Type
-	mainBody []Expr
+	output      io.Writer
+	funcs       map[string]Evaler
+	types       map[Type]Type
+	typeAliases map[Type]Type
+	mainBody    []Expr
 
 	// string->filepath map to control where function was initially defined.
 	funcsOrigins map[string]string
@@ -68,10 +70,13 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 		TypeStr:     TypeAny,
 		TypeBool:    TypeAny,
 		TypeFunc:    TypeAny,
-		TypeList:    TypeAny,
+		":list[a]":  TypeAny,
 	}
 	for c := 'a'; c <= 'z'; c++ {
 		i.types[Type(fmt.Sprintf(":%c", c))] = ""
+	}
+	i.typeAliases = map[Type]Type{
+		TypeList: ":list[a]",
 	}
 	return i
 }
@@ -305,6 +310,9 @@ func (in *Interpret) defineType(args []Expr) error {
 	if !ok {
 		return fmt.Errorf("deftype expects first argument to be new type, found: %v", args[0])
 	}
+	if alias, ok := in.typeAliases[oldType]; ok {
+		oldType = alias
+	}
 	if _, ok := in.types[oldType]; !ok {
 		return fmt.Errorf("Basic type does not exist: %v", oldType)
 	}
@@ -313,13 +321,27 @@ func (in *Interpret) defineType(args []Expr) error {
 }
 
 func (in *Interpret) canConvertType(from, to Type) (bool, error) {
-	if _, ok := in.types[to]; !ok {
+	from = from.Canonical()
+	to = to.Canonical()
+	if alias, ok := in.typeAliases[to]; ok {
+		to = alias
+	}
+	if alias, ok := in.typeAliases[from]; ok {
+		from = alias
+	}
+	if _, ok := in.types[to.Canonical()]; !ok {
 		return false, fmt.Errorf("Cannot convert type %v into %v: %v is not defined", from, to, to)
 	}
 	if from == to {
 		return true, nil
 	}
 	for {
+		if alias, ok := in.typeAliases[from]; ok {
+			from = alias
+		}
+		if from == to {
+			return true, nil
+		}
 		parent, ok := in.types[from]
 		if !ok {
 			return false, fmt.Errorf("Cannot convert type %v into %v: %v is not defined", from, to, from)
@@ -704,9 +726,64 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 }
 
 func (in *Interpret) parseType(token string) (Type, error) {
+	if alias, ok := in.typeAliases[Type(token)]; ok {
+		token = string(alias)
+	}
 	_, ok := in.types[Type(token)]
 	if !ok {
 		return "", fmt.Errorf("Cannot parse type %v: not defined", token)
 	}
 	return Type(token), nil
+}
+
+func (in *Interpret) toParent(from, parent Type) (Type, error) {
+	binds := map[string]string{}
+	for i, p := range from.Arguments() {
+		if len(p) == 1 {
+			// generic
+			continue
+		}
+		binds[string('a'+i)] = p
+	}
+	f := from.Canonical()
+	for {
+		if f == "" {
+			return TypeUnknown, fmt.Errorf("Cannot convert %v into %v", from, parent)
+		}
+		if f.Basic() == parent.Basic() {
+			parent = f
+			break
+		}
+		if alias, ok := in.typeAliases[f]; ok {
+			f = alias
+		}
+		if f.Basic() == parent.Basic() {
+			parent = f
+			break
+		}
+		par, ok := in.types[f]
+		if !ok {
+			return TypeUnknown, fmt.Errorf("Cannot convert type %v into %v: %v is not defined", from, parent, f)
+		}
+		f = par
+	}
+	log.Printf("toParent: %v -> parent = %v", from, parent)
+	res := ":" + parent.Basic()
+	if len(parent.Arguments()) > 0 {
+		res += "["
+		for j, a := range parent.Arguments() {
+			if j > 0 {
+				res += ","
+			}
+			// a := string('a' + j)
+			if b, ok := binds[a]; ok {
+				res += b
+			} else {
+				res += a
+			}
+		}
+		res += "]"
+	}
+
+	return Type(res), nil
 }

@@ -782,3 +782,32 @@ func (f *FuncRuntime) cleanup() {
 	}
 	f.scopedVars = f.scopedVars[:0]
 }
+
+func (i *Interpret) matchType(arg Type, val Type, typeBinds *map[Type]Type) (bool, error) {
+	if arg.Generic() {
+		if bind, ok := (*typeBinds)[arg]; ok && bind != val {
+			return false, nil
+		}
+		(*typeBinds)[arg] = val
+		return true, nil
+	}
+
+	parent, err := i.toParent(val, Type(arg.Basic()))
+	if err != nil {
+		return false, err
+	}
+
+	aParams := arg.Arguments()
+	vParams := parent.Arguments()
+	if len(aParams) != len(vParams) {
+		log.Printf("return false")
+		return false, nil
+	}
+	for j, p := range aParams {
+		ok, err := i.matchType(Type(p), Type(vParams[j]), typeBinds)
+		if err != nil || !ok {
+			return false, err
+		}
+	}
+	return true, nil
+}
