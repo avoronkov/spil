@@ -90,7 +90,7 @@ func (f *FuncInterpret) TryBind(params []Param) (int, Type, error) {
 	for idx, im := range f.bodies {
 		if ok, types := f.matchParameters(im.argfmt, params); ok {
 			t := im.returnType
-			if newT, ok := types[t]; ok {
+			if newT, ok := types[t.Basic()]; ok {
 				t = newT
 			}
 			if len(types) > 0 {
@@ -686,7 +686,7 @@ func (f *FuncRuntime) evalApply(se *Sexpr) (Expr, error) {
 	}, nil
 }
 
-func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []Param) (result bool, types map[Type]Type) {
+func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []Param) (result bool, types map[string]Type) {
 	if argfmt == nil {
 		// null matches everything (lambda case)
 		return true, nil
@@ -696,22 +696,35 @@ func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []Param) (result 
 	}
 
 	binds := map[string]Expr{}
-	typeBinds := map[Type]Type{}
+	typeBinds := map[string]Type{}
 	if len(argfmt.Args) != len(params) {
 		return false, nil
 	}
 	for i, arg := range argfmt.Args {
 		param := params[i]
-		if !f.matchParam(&arg, &param) {
+		// log.Printf("matchType(%v, %v, %v)", arg.T, param.T, typeBinds)
+		match, err := f.interpret.matchType(arg.T, param.T, &typeBinds)
+		if err != nil {
+			// fmt.Fprintf(os.Stderr, "error: %v", err)
 			return false, nil
 		}
-		if arg.T.Generic() {
-			if binded, ok := typeBinds[arg.T]; ok && binded != param.T {
-				fmt.Fprintf(os.Stderr, "Generic type %v is already binded to %v: cannot match %v\n", arg.T, binded, param.T)
-				return false, nil
-			}
-			typeBinds[arg.T] = param.T
+		if !match {
+			// log.Printf("return false 1")
+			return false, nil
 		}
+		if !f.matchParam(&arg, &param) {
+			// log.Printf("return false 2")
+			return false, nil
+		}
+		/*
+			if arg.T.Generic() {
+				if binded, ok := typeBinds[arg.T]; ok && binded != param.T {
+					fmt.Fprintf(os.Stderr, "Generic type %v is already binded to %v: cannot match %v\n", arg.T, binded, param.T)
+					return false, nil
+				}
+				typeBinds[arg.T] = param.T
+			}
+		*/
 		if arg.Name == "" {
 			continue
 		}
@@ -783,12 +796,15 @@ func (f *FuncRuntime) cleanup() {
 	f.scopedVars = f.scopedVars[:0]
 }
 
-func (i *Interpret) matchType(arg Type, val Type, typeBinds *map[Type]Type) (bool, error) {
+func (i *Interpret) matchType(arg Type, val Type, typeBinds *map[string]Type) (bool, error) {
 	if arg.Generic() {
-		if bind, ok := (*typeBinds)[arg]; ok && bind != val {
+		if bind, ok := (*typeBinds)[arg.Basic()]; ok && string(bind) != strings.TrimLeft(string(val), ":") {
 			return false, nil
 		}
-		(*typeBinds)[arg] = val
+		(*typeBinds)[arg.Basic()] = Type(strings.TrimLeft(string(val), ":"))
+		return true, nil
+	}
+	if val == TypeUnknown || arg == TypeUnknown {
 		return true, nil
 	}
 

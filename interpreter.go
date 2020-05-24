@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,7 +66,7 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 		TypeUnknown: "",
 		TypeAny:     "",
 		TypeInt:     TypeAny,
-		TypeStr:     TypeAny,
+		TypeStr:     TypeList,
 		TypeBool:    TypeAny,
 		TypeFunc:    TypeAny,
 		":list[a]":  TypeAny,
@@ -767,7 +766,6 @@ func (in *Interpret) toParent(from, parent Type) (Type, error) {
 		}
 		f = par
 	}
-	log.Printf("toParent: %v -> parent = %v", from, parent)
 	res := ":" + parent.Basic()
 	if len(parent.Arguments()) > 0 {
 		res += "["

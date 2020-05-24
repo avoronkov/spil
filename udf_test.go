@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestMatchArgs(t *testing.T) {
+func TestMatchParameters(t *testing.T) {
 	tests := []struct {
 		name   string
 		argfmt *ArgFmt
@@ -152,6 +152,18 @@ func TestMatchArgs(t *testing.T) {
 			[]Param{Param{T: TypeInt}, Param{T: TypeStr}},
 			false,
 		},
+		{
+			":a :list[a] vs :int :list[int]",
+			MakeArgFmt(Arg{Name: "elem", T: ":a"}, Arg{Name: "lst", T: ":list[a]"}),
+			[]Param{Param{T: TypeInt}, Param{T: ":list[int]"}},
+			true,
+		},
+		{
+			":a :list[a] vs :int :list[any]",
+			MakeArgFmt(Arg{Name: "elem", T: ":a"}, Arg{Name: "lst", T: ":list[a]"}),
+			[]Param{Param{T: TypeInt}, Param{T: ":list[any]"}},
+			false,
+		},
 	}
 	in := NewInterpreter(os.Stderr, "")
 	fi := NewFuncInterpret(in, "__test__")
@@ -200,24 +212,24 @@ func TestMatchType(t *testing.T) {
 		name   string
 		arg    Type
 		val    Type
-		binds  *map[Type]Type
+		binds  *map[string]Type
 		result bool
 	}{
-		{"int-int", ":int", ":int", &map[Type]Type{}, true},
-		{"any-int", ":any", ":int", &map[Type]Type{}, true},
-		{"a-int", ":a", ":int", &map[Type]Type{}, true},
-		{"a-int-str", ":a", ":str", &map[Type]Type{":a": ":int"}, false},
-		{"list[a]-list[int]", ":list[a]", ":list[int]", &map[Type]Type{}, true},
-		{"list[int]-tset[int]", ":list[int]", ":tset[int]", &map[Type]Type{}, true},
-		{"list[a]-tset[int]", ":list[a]", ":tset[int]", &map[Type]Type{}, true},
-		{"list[any]-set", ":list[any]", ":set", &map[Type]Type{}, true},
-		{"some[a,a]-some[x,y]", ":some[a,a]", ":some[x,y]", &map[Type]Type{}, false},
-		{"some[a,b]-some[x,y]", ":some[a,b]", ":some[x,y]", &map[Type]Type{}, true},
-		{"some[int,b]-some[int,y]", ":some[int,b]", ":some[int,y]", &map[Type]Type{}, true},
-		{"some[int,b]-some[x,y]", ":some[a,b]", ":some[int,y]", &map[Type]Type{}, true},
-		{"some[a,b]-intsome[a]", ":some[a,b]", ":intsome[a]", &map[Type]Type{}, true},
-		{"some[a,list[a]]-some[int,list[int]]", ":some[a,list[a]]", ":some[int,list[int]]", &map[Type]Type{}, true},
-		{"some[a,list[a]]-some[int,list[str]]", ":some[a,list[a]]", ":some[int,list[str]]", &map[Type]Type{}, false},
+		{"int-int", ":int", ":int", &map[string]Type{}, true},
+		{"any-int", ":any", ":int", &map[string]Type{}, true},
+		{"a-int", ":a", ":int", &map[string]Type{}, true},
+		{"a-int-str", ":a", ":str", &map[string]Type{"a": ":int"}, false},
+		{"list[a]-list[int]", ":list[a]", ":list[int]", &map[string]Type{}, true},
+		{"list[int]-tset[int]", ":list[int]", ":tset[int]", &map[string]Type{}, true},
+		{"list[a]-tset[int]", ":list[a]", ":tset[int]", &map[string]Type{}, true},
+		{"list[any]-set", ":list[any]", ":set", &map[string]Type{}, true},
+		{"some[a,a]-some[x,y]", ":some[a,a]", ":some[x,y]", &map[string]Type{}, false},
+		{"some[a,b]-some[x,y]", ":some[a,b]", ":some[x,y]", &map[string]Type{}, true},
+		{"some[int,b]-some[int,y]", ":some[int,b]", ":some[int,y]", &map[string]Type{}, true},
+		{"some[int,b]-some[x,y]", ":some[a,b]", ":some[int,y]", &map[string]Type{}, true},
+		{"some[a,b]-intsome[a]", ":some[a,b]", ":intsome[a]", &map[string]Type{}, true},
+		{"some[a,list[a]]-some[int,list[int]]", ":some[a,list[a]]", ":some[int,list[int]]", &map[string]Type{}, true},
+		{"some[a,list[a]]-some[int,list[str]]", ":some[a,list[a]]", ":some[int,list[str]]", &map[string]Type{}, false},
 	}
 
 	in := NewInterpreter(os.Stderr, "")
