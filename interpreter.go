@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -69,13 +70,13 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 		TypeStr:     TypeList,
 		TypeBool:    TypeAny,
 		TypeFunc:    TypeAny,
-		":list[a]":  TypeAny,
+		"list[a]":   TypeAny,
 	}
 	for c := 'a'; c <= 'z'; c++ {
-		i.types[Type(fmt.Sprintf(":%c", c))] = ""
+		i.types[Type(string(c))] = ""
 	}
 	i.typeAliases = map[Type]Type{
-		TypeList: ":list[a]",
+		TypeList: "list[any]",
 	}
 	return i
 }
@@ -341,7 +342,7 @@ func (in *Interpret) canConvertType(from, to Type) (bool, error) {
 		if from == to {
 			return true, nil
 		}
-		parent, ok := in.types[from]
+		parent, ok := in.types[from.Canonical()]
 		if !ok {
 			return false, fmt.Errorf("Cannot convert type %v into %v: %v is not defined", from, to, from)
 		}
@@ -725,10 +726,16 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 }
 
 func (in *Interpret) parseType(token string) (Type, error) {
-	if alias, ok := in.typeAliases[Type(token)]; ok {
-		token = string(alias)
+	log.Printf("parseType(%q)", token)
+	t, ok := ParseType(token)
+	if !ok {
+		return TypeUnknown, fmt.Errorf("Token is not a type: %q", token)
 	}
-	_, ok := in.types[Type(token)]
+	if alias, ok := in.typeAliases[t]; ok {
+		t = alias
+		log.Printf("parseType: token = %v", t)
+	}
+	_, ok = in.types[t]
 	if !ok {
 		return "", fmt.Errorf("Cannot parse type %v: not defined", token)
 	}
@@ -766,7 +773,7 @@ func (in *Interpret) toParent(from, parent Type) (Type, error) {
 		}
 		f = par
 	}
-	res := ":" + parent.Basic()
+	res := parent.Basic()
 	if len(parent.Arguments()) > 0 {
 		res += "["
 		for j, a := range parent.Arguments() {

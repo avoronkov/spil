@@ -807,6 +807,10 @@ func (i *Interpret) matchType(arg Type, val Type, typeBinds *map[string]Type) (b
 	if val == TypeUnknown || arg == TypeUnknown {
 		return true, nil
 	}
+	log.Printf("typeAliases: %v, arg=%v, var=%v", i.typeAliases, arg, val)
+	if i.typeAliases[arg] == val || i.typeAliases[val] == arg {
+		return true, nil
+	}
 
 	parent, err := i.toParent(val, Type(arg.Basic()))
 	if err != nil {

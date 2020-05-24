@@ -142,27 +142,39 @@ func TestMatchParameters(t *testing.T) {
 		},
 		{
 			":a :a vs :int :int",
-			MakeArgFmt(Arg{Name: "a", T: ":a"}, Arg{Name: "b", T: ":a"}),
+			MakeArgFmt(Arg{Name: "a", T: "a"}, Arg{Name: "b", T: "a"}),
 			[]Param{{T: TypeInt}, {T: TypeInt}},
 			true,
 		},
 		{
 			":a :a vs :int :str",
-			MakeArgFmt(Arg{Name: "a", T: ":a"}, Arg{Name: "b", T: ":a"}),
+			MakeArgFmt(Arg{Name: "a", T: "a"}, Arg{Name: "b", T: "a"}),
 			[]Param{Param{T: TypeInt}, Param{T: TypeStr}},
 			false,
 		},
 		{
 			":a :list[a] vs :int :list[int]",
-			MakeArgFmt(Arg{Name: "elem", T: ":a"}, Arg{Name: "lst", T: ":list[a]"}),
-			[]Param{Param{T: TypeInt}, Param{T: ":list[int]"}},
+			MakeArgFmt(Arg{Name: "elem", T: "a"}, Arg{Name: "lst", T: "list[a]"}),
+			[]Param{Param{T: TypeInt}, Param{T: "list[int]"}},
 			true,
 		},
 		{
 			":a :list[a] vs :int :list[any]",
-			MakeArgFmt(Arg{Name: "elem", T: ":a"}, Arg{Name: "lst", T: ":list[a]"}),
-			[]Param{Param{T: TypeInt}, Param{T: ":list[any]"}},
+			MakeArgFmt(Arg{Name: "elem", T: "a"}, Arg{Name: "lst", T: "list[a]"}),
+			[]Param{Param{T: TypeInt}, Param{T: "list[any]"}},
 			false,
+		},
+		{
+			":list vs :list[any]",
+			MakeArgFmt(Arg{Name: "lst", T: "list[any]"}),
+			[]Param{Param{T: "list"}},
+			true,
+		},
+		{
+			":list[any] vs :list",
+			MakeArgFmt(Arg{Name: "lst", T: "list"}),
+			[]Param{Param{T: "list[any]"}},
+			true,
 		},
 	}
 	in := NewInterpreter(os.Stderr, "")
@@ -190,10 +202,10 @@ func TestCanConvertType(t *testing.T) {
 		from, to Type
 		res      bool
 	}{
-		{":int", ":any", true},
-		{":list[a]", ":any", true},
-		{":list[z]", ":any", true},
-		{":list", ":any", true},
+		{"int", "any", true},
+		{"list[a]", "any", true},
+		{"list[z]", "any", true},
+		{"list", "any", true},
 	}
 	in := NewInterpreter(os.Stderr, "")
 	for _, test := range tests {
@@ -215,28 +227,30 @@ func TestMatchType(t *testing.T) {
 		binds  *map[string]Type
 		result bool
 	}{
-		{"int-int", ":int", ":int", &map[string]Type{}, true},
-		{"any-int", ":any", ":int", &map[string]Type{}, true},
-		{"a-int", ":a", ":int", &map[string]Type{}, true},
-		{"a-int-str", ":a", ":str", &map[string]Type{"a": ":int"}, false},
-		{"list[a]-list[int]", ":list[a]", ":list[int]", &map[string]Type{}, true},
-		{"list[int]-tset[int]", ":list[int]", ":tset[int]", &map[string]Type{}, true},
-		{"list[a]-tset[int]", ":list[a]", ":tset[int]", &map[string]Type{}, true},
-		{"list[any]-set", ":list[any]", ":set", &map[string]Type{}, true},
-		{"some[a,a]-some[x,y]", ":some[a,a]", ":some[x,y]", &map[string]Type{}, false},
-		{"some[a,b]-some[x,y]", ":some[a,b]", ":some[x,y]", &map[string]Type{}, true},
-		{"some[int,b]-some[int,y]", ":some[int,b]", ":some[int,y]", &map[string]Type{}, true},
-		{"some[int,b]-some[x,y]", ":some[a,b]", ":some[int,y]", &map[string]Type{}, true},
-		{"some[a,b]-intsome[a]", ":some[a,b]", ":intsome[a]", &map[string]Type{}, true},
-		{"some[a,list[a]]-some[int,list[int]]", ":some[a,list[a]]", ":some[int,list[int]]", &map[string]Type{}, true},
-		{"some[a,list[a]]-some[int,list[str]]", ":some[a,list[a]]", ":some[int,list[str]]", &map[string]Type{}, false},
+		{"int-int", "int", "int", &map[string]Type{}, true},
+		{"any-int", "any", "int", &map[string]Type{}, true},
+		{"a-int", "a", "int", &map[string]Type{}, true},
+		{"a-int-str", "a", "str", &map[string]Type{"a": "int"}, false},
+		{"list[a]-list[int]", "list[a]", "list[int]", &map[string]Type{}, true},
+		{"list[int]-tset[int]", "list[int]", "tset[int]", &map[string]Type{}, true},
+		{"list[a]-tset[int]", "list[a]", "tset[int]", &map[string]Type{}, true},
+		{"list[any]-set", "list[any]", "set", &map[string]Type{}, true},
+		{"some[a,a]-some[x,y]", "some[a,a]", "some[x,y]", &map[string]Type{}, false},
+		{"some[a,b]-some[x,y]", "some[a,b]", "some[x,y]", &map[string]Type{}, true},
+		{"some[int,b]-some[int,y]", "some[int,b]", "some[int,y]", &map[string]Type{}, true},
+		{"some[int,b]-some[x,y]", "some[a,b]", "some[int,y]", &map[string]Type{}, true},
+		{"some[a,b]-intsome[a]", "some[a,b]", "intsome[a]", &map[string]Type{}, true},
+		{"some[a,list[a]]-some[int,list[int]]", "some[a,list[a]]", "some[int,list[int]]", &map[string]Type{}, true},
+		{"some[a,list[a]]-some[int,list[str]]", "some[a,list[a]]", "some[int,list[str]]", &map[string]Type{}, false},
+		{"list-list[any]", "list", "list[any]", &map[string]Type{}, true},
+		{"list[any]-list", "list[any]", "list", &map[string]Type{}, true},
 	}
 
 	in := NewInterpreter(os.Stderr, "")
-	in.types[":some[a,b]"] = TypeAny
-	in.types[":set"] = ":list[any]"
-	in.types[":tset[a]"] = ":list[a]"
-	in.types[":intsome[a]"] = ":some[int,a]"
+	in.types["some[a,b]"] = TypeAny
+	in.types["set"] = "list[any]"
+	in.types["tset[a]"] = "list[a]"
+	in.types["intsome[a]"] = "some[int,a]"
 
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -259,17 +273,17 @@ func TestToParent(t *testing.T) {
 		from, parent Type
 		exp          Type
 	}{
-		{"set->list", ":set", "list", ":list[any]"},
-		{"tset[bool]->list", ":tset[bool]", "list", ":list[bool]"},
-		{"list[int]->any", ":list[int]", "any", ":any"},
-		{"intsome[str]->some", ":intsome[str]", "some", ":some[int,str]"},
+		{"set->list", "set", "list", "list[any]"},
+		{"tset[bool]->list", "tset[bool]", "list", "list[bool]"},
+		{"list[int]->any", "list[int]", "any", "any"},
+		{"intsome[str]->some", "intsome[str]", "some", "some[int,str]"},
 	}
 
 	in := NewInterpreter(os.Stderr, "")
-	in.types[":some[a,b]"] = TypeAny
-	in.types[":set"] = ":list[any]"
-	in.types[":tset[a]"] = ":list[a]"
-	in.types[":intsome[a]"] = ":some[int,a]"
+	in.types["some[a,b]"] = TypeAny
+	in.types["set"] = "list[any]"
+	in.types["tset[a]"] = "list[a]"
+	in.types["intsome[a]"] = "some[int,a]"
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

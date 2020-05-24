@@ -10,8 +10,8 @@ func TestBasic(t *testing.T) {
 		arg Type
 		exp string
 	}{
-		{":int", "int"},
-		{":list[a,b]", "list"},
+		{"int", "int"},
+		{"list[a,b]", "list"},
 	}
 	for _, test := range tests {
 		t.Run(string(test.arg), func(t *testing.T) {

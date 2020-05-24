@@ -8,26 +8,26 @@ import (
 type Type string
 
 const (
-	TypeUnknown Type = ":unknown"
-	TypeAny     Type = ":any"
-	TypeInt     Type = ":int"
-	TypeStr     Type = ":str"
-	TypeBool    Type = ":bool"
-	TypeFunc    Type = ":func"
-	TypeList    Type = ":list"
+	TypeUnknown Type = "unknown"
+	TypeAny     Type = "any"
+	TypeInt     Type = "int"
+	TypeStr     Type = "str"
+	TypeBool    Type = "bool"
+	TypeFunc    Type = "func"
+	TypeList    Type = "list"
 )
 
 func (t Type) String() string {
-	return string(t)
+	return ":" + string(t)
 }
 
 func (t Type) Generic() bool {
-	return len(strings.TrimLeft(string(t), ":")) == 1
+	return len(t) == 1
 }
 
 // ":list[a]" -> "list"
 func (t Type) Basic() string {
-	res := strings.TrimLeft(string(t), ":")
+	res := string(t)
 	if p := strings.Index(res, "["); p >= 0 {
 		res = res[:p]
 	}
@@ -46,7 +46,7 @@ func (t Type) Arguments() []string {
 
 // ":x[int,str,list]" -> "x[a,b,c]"
 func (t Type) Canonical() Type {
-	res := ":" + t.Basic()
+	res := t.Basic()
 	args := t.Arguments()
 	if len(args) > 0 {
 		res += "["
@@ -63,7 +63,7 @@ func (t Type) Canonical() Type {
 
 func ParseType(token string) (Type, bool) {
 	if strings.HasPrefix(token, ":") {
-		return Type(token), true
+		return Type(token[1:]), true
 	}
 	return TypeUnknown, false
 }

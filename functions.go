@@ -448,7 +448,7 @@ func (in *Interpret) ListArg(params []Param) error {
 
 	ok, err := in.canConvertType(params[0].T, TypeList)
 	if err != nil {
-		return err
+		return fmt.Errorf("Cannot convert first argument to List: %w", err)
 	}
 	if ok {
 		return nil
@@ -513,7 +513,7 @@ func (in *Interpret) IntAndListArgs(params []Param) error {
 
 	ok, err = in.canConvertType(params[1].T, TypeList)
 	if err != nil {
-		return err
+		return fmt.Errorf("Second argument is not a list: %w", err)
 	}
 	if !ok && params[1].T != TypeUnknown && !params[1].T.Generic() {
 		return fmt.Errorf("expected second argument to be List, found %v", params)
