@@ -87,7 +87,6 @@ func (f *FuncInterpret) AddVar(name string, p *Param) {
 }
 
 func (f *FuncInterpret) TryBind(params []Param) (int, Type, error) {
-	// log.Printf("TryBind(%v)", params)
 	for idx, im := range f.bodies {
 		if ok, types := f.matchParameters(im.argfmt, params); ok {
 			t := im.returnType
@@ -101,6 +100,9 @@ func (f *FuncInterpret) TryBind(params []Param) (int, Type, error) {
 					values[arg.Name] = params[i].T
 				}
 				tt, err := f.interpret.evalBodyType(f.name, im.body, values)
+				if newTt, ok := types[tt.Basic()]; ok {
+					tt = newTt
+				}
 
 				if err != nil {
 					return -1, "", err
@@ -118,7 +120,7 @@ func (f *FuncInterpret) TryBind(params []Param) (int, Type, error) {
 
 func (f *FuncInterpret) Eval(params []Param) (result *Param, err error) {
 	run := NewFuncRuntime(f)
-	impl, result, err := run.bind(params)
+	impl, result, rt, err := run.bind(params)
 	if err != nil {
 		return nil, err
 	}
@@ -130,6 +132,7 @@ func (f *FuncInterpret) Eval(params []Param) (result *Param, err error) {
 		return nil, err
 	}
 	run.cleanup()
+	res.T = rt
 	return res, err
 }
 
@@ -143,6 +146,7 @@ type FuncRuntime struct {
 	args []Expr
 	// variables that should be Closed after leaving this variable scope.
 	scopedVars []string
+	types      map[string]Type
 }
 
 func NewFuncRuntime(fi *FuncInterpret) *FuncRuntime {
@@ -164,15 +168,15 @@ func keyOfArgs(args []Expr) (string, error) {
 	return b.String(), nil
 }
 
-func (f *FuncRuntime) bind(params []Param) (impl *FuncImpl, result *Param, err error) {
+func (f *FuncRuntime) bind(params []Param) (impl *FuncImpl, result *Param, resultType Type, err error) {
 	f.cleanup()
 	args := make([]Expr, 0, len(params))
 	for _, p := range params {
 		args = append(args, p.V)
 	}
-	idx, _, err := f.fi.TryBind(params)
+	idx, rt, err := f.fi.TryBind(params)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	impl = f.fi.bodies[idx]
 	if impl.memo {
@@ -180,7 +184,7 @@ func (f *FuncRuntime) bind(params []Param) (impl *FuncImpl, result *Param, err e
 		if err != nil {
 			log.Printf("Cannot compute hash of args: %v, %v", args, err)
 		} else if res, ok := impl.results[keyArgs]; ok {
-			return nil, res, nil
+			return nil, res, "", nil
 		}
 	}
 
@@ -211,7 +215,7 @@ func (f *FuncRuntime) bind(params []Param) (impl *FuncImpl, result *Param, err e
 		f.vars[fmt.Sprintf("_%d", i+1)] = arg
 	}
 	f.args = args
-	return impl, nil, nil
+	return impl, nil, rt, nil
 }
 
 func (f *FuncRuntime) Eval(impl *FuncImpl) (res *Param, err error) {
@@ -299,7 +303,7 @@ L:
 					args = append(args, *arg)
 				}
 				var result *Param
-				impl, result, err = f.bind(args)
+				impl, result, _, err = f.bind(args)
 				if err != nil {
 					return nil, err
 				}
