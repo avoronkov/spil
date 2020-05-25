@@ -374,7 +374,7 @@ func FType(args []Param) (*Param, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf(": expected exaclty one argument, found %v", args)
 	}
-	return &Param{V: Str(args[0].T), T: TypeStr}, nil
+	return &Param{V: Str(args[0].T.String()), T: TypeStr}, nil
 }
 
 type Lenghter interface {
@@ -446,7 +446,8 @@ func (in *Interpret) ListArg(params []Param) error {
 		return fmt.Errorf("expected 1 argument, found %v", params)
 	}
 
-	ok, err := in.canConvertType(params[0].T, TypeList)
+	// log.Printf("ListArg: matchType(%v, %v ...) %v", TypeList, params[0].T, in.types)
+	ok, err := in.matchType("list[a]", params[0].T, &map[string]Type{})
 	if err != nil {
 		return fmt.Errorf("Cannot convert first argument to List: %w", err)
 	}

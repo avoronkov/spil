@@ -87,6 +87,7 @@ func (f *FuncInterpret) AddVar(name string, p *Param) {
 }
 
 func (f *FuncInterpret) TryBind(params []Param) (int, Type, error) {
+	// log.Printf("TryBind(%v)", params)
 	for idx, im := range f.bodies {
 		if ok, types := f.matchParameters(im.argfmt, params); ok {
 			t := im.returnType
@@ -705,14 +706,14 @@ func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []Param) (result 
 		// log.Printf("matchType(%v, %v, %v)", arg.T, param.T, typeBinds)
 		match, err := f.interpret.matchType(arg.T, param.T, &typeBinds)
 		if err != nil {
-			// fmt.Fprintf(os.Stderr, "error: %v", err)
+			// log.Printf("error: %v", err)
 			return false, nil
 		}
 		if !match {
 			// log.Printf("return false 1")
 			return false, nil
 		}
-		if !f.matchParam(&arg, &param) {
+		if !f.matchValue(&arg, &param) {
 			// log.Printf("return false 2")
 			return false, nil
 		}
@@ -741,6 +742,13 @@ func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []Param) (result 
 	return true, typeBinds
 }
 
+func (f *FuncInterpret) matchValue(a *Arg, p *Param) bool {
+	if a.V == nil || p.V == nil {
+		return true
+	}
+	return Equal(a.V, p.V)
+}
+
 func (f *FuncInterpret) matchParam(a *Arg, p *Param) bool {
 	if a.T.Generic() {
 		return true
@@ -765,6 +773,7 @@ func (f *FuncInterpret) matchParam(a *Arg, p *Param) bool {
 			return false
 		}
 		if !canConvert && p.T != TypeUnknown {
+			// log.Printf("cannot convert...")
 			return false
 		}
 	}
@@ -807,20 +816,22 @@ func (i *Interpret) matchType(arg Type, val Type, typeBinds *map[string]Type) (b
 	if val == TypeUnknown || arg == TypeUnknown {
 		return true, nil
 	}
-	log.Printf("typeAliases: %v, arg=%v, var=%v", i.typeAliases, arg, val)
+	// log.Printf("typeAliases: %v, arg=%v, var=%v", i.typeAliases, arg, val)
 	if i.typeAliases[arg] == val || i.typeAliases[val] == arg {
 		return true, nil
 	}
 
+	// log.Printf("toParent: %v, %v", val, arg.Basic())
 	parent, err := i.toParent(val, Type(arg.Basic()))
 	if err != nil {
+		// log.Printf("toParent failed: %v", err)
 		return false, err
 	}
 
 	aParams := arg.Arguments()
 	vParams := parent.Arguments()
 	if len(aParams) != len(vParams) {
-		log.Printf("return false")
+		// log.Printf("return false")
 		return false, nil
 	}
 	for j, p := range aParams {

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -313,7 +312,7 @@ func (in *Interpret) defineType(args []Expr) error {
 	if alias, ok := in.typeAliases[oldType]; ok {
 		oldType = alias
 	}
-	if _, ok := in.types[oldType]; !ok {
+	if _, ok := in.types[oldType.Canonical()]; !ok {
 		return fmt.Errorf("Basic type does not exist: %v", oldType)
 	}
 	in.types[newType] = oldType
@@ -592,8 +591,8 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 			return t, nil
 		} else if _, ok := i.funcs[string(a)]; ok {
 			return TypeFunc, nil
-		} else if _, err := i.parseType(string(a)); err == nil {
-			return Type(a), nil
+		} else if t, err := i.parseType(string(a)); err == nil {
+			return t, nil
 		}
 		return u, fmt.Errorf("Undefined variable: %v", string(a))
 	case *Sexpr:
@@ -647,6 +646,7 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 			if err != nil {
 				return u, err
 			}
+			// log.Printf("condType = %v", condType)
 			if condType != TypeBool && condType != TypeUnknown {
 				return u, fmt.Errorf("%v: condition in if-statement should return :bool, found: %v", fname, condType)
 			}
@@ -666,7 +666,10 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 			}
 			return t1, nil
 		case "do":
-			return i.evalBodyType(fname, a.List[1:], vars)
+
+			res, err := i.evalBodyType(fname, a.List[1:], vars)
+			// log.Printf("DO: %v, %v", res, err)
+			return res, err
 		default:
 			// this is a function call
 			if tvar, ok := vars[name]; ok {
@@ -701,6 +704,7 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 						if err != nil {
 							return u, err
 						}
+						// log.Printf("append %v", itemType)
 						params = append(params, Param{T: itemType})
 					}
 				case Ident:
@@ -726,20 +730,22 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 }
 
 func (in *Interpret) parseType(token string) (Type, error) {
-	log.Printf("parseType(%q)", token)
+	// log.Printf("parseType(%q)", token)
 	t, ok := ParseType(token)
 	if !ok {
 		return TypeUnknown, fmt.Errorf("Token is not a type: %q", token)
 	}
 	if alias, ok := in.typeAliases[t]; ok {
 		t = alias
-		log.Printf("parseType: token = %v", t)
+		// log.Printf("parseType: token = %v", t)
 	}
-	_, ok = in.types[t]
+	// log.Printf("check if type exist: %v in %v", t.Canonical(), in.types)
+	_, ok = in.types[t.Canonical()]
 	if !ok {
 		return "", fmt.Errorf("Cannot parse type %v: not defined", token)
 	}
-	return Type(token), nil
+	// log.Printf("parseType returned %v", Type(token))
+	return t, nil
 }
 
 func (in *Interpret) toParent(from, parent Type) (Type, error) {
@@ -767,7 +773,7 @@ func (in *Interpret) toParent(from, parent Type) (Type, error) {
 			parent = f
 			break
 		}
-		par, ok := in.types[f]
+		par, ok := in.types[f.Canonical()]
 		if !ok {
 			return TypeUnknown, fmt.Errorf("Cannot convert type %v into %v: %v is not defined", from, parent, f)
 		}

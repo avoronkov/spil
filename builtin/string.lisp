@@ -1,5 +1,5 @@
 ;; split string into words
-(def next-string (sep:str str:str) :list (next-string sep str (do "" :str)))
+(def next-string (sep:str str:str) :list (next-string sep str ""))
 (def next-string (sep:str '() "") :list '())
 (def next-string (sep:str '() acc:str) :list (list acc ""))
 (def next-string (sep:str str:str acc:str) :list

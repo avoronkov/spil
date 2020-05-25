@@ -84,7 +84,7 @@ func checkInterpreter(t *testing.T, input, output string, builtin, bigint bool) 
 	}
 
 	if act, exp := buffer.String(), string(expData); act != exp {
-		t.Errorf("Incorrect output for %v: expected %q, actual %q", input, exp, act)
+		t.Errorf("Incorrect output for %v:\nexpected %q,\n  actual %q", input, exp, act)
 	}
 }
 

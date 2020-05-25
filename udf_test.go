@@ -244,6 +244,7 @@ func TestMatchType(t *testing.T) {
 		{"some[a,list[a]]-some[int,list[str]]", "some[a,list[a]]", "some[int,list[str]]", &map[string]Type{}, false},
 		{"list-list[any]", "list", "list[any]", &map[string]Type{}, true},
 		{"list[any]-list", "list[any]", "list", &map[string]Type{}, true},
+		{"list-any", "any", "list", &map[string]Type{}, true},
 	}
 
 	in := NewInterpreter(os.Stderr, "")
