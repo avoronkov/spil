@@ -125,7 +125,7 @@ func TestMatchParameters(t *testing.T) {
 		{
 			"list vs set",
 			MakeArgFmt(Arg{Name: "n", T: TypeList}),
-			[]Param{Param{T: Type(":set"), V: QEmpty}},
+			[]Param{Param{T: Type("set"), V: QEmpty}},
 			true,
 		},
 		{
@@ -179,7 +179,7 @@ func TestMatchParameters(t *testing.T) {
 	}
 	in := NewInterpreter(os.Stderr, "")
 	fi := NewFuncInterpret(in, "__test__")
-	in.types[Type(":set")] = TypeList
+	in.types[Type("set")] = "list[any]"
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			act, _ := fi.matchParameters(test.argfmt, test.args)
@@ -245,6 +245,8 @@ func TestMatchType(t *testing.T) {
 		{"list-list[any]", "list", "list[any]", &map[string]Type{}, true},
 		{"list[any]-list", "list[any]", "list", &map[string]Type{}, true},
 		{"list-any", "any", "list", &map[string]Type{}, true},
+		{"list[a]-list", "list[a]", "list", &map[string]Type{}, true},
+		{"list[a]-list[any]", "list[a]", "list[any]", &map[string]Type{}, true},
 	}
 
 	in := NewInterpreter(os.Stderr, "")

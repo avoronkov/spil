@@ -809,7 +809,15 @@ func (f *FuncRuntime) cleanup() {
 	f.scopedVars = f.scopedVars[:0]
 }
 
-func (i *Interpret) matchType(arg Type, val Type, typeBinds *map[string]Type) (bool, error) {
+func (i *Interpret) matchType(arg Type, val Type, typeBinds *map[string]Type) (result bool, eerroorr error) {
+	if alias, ok := i.typeAliases[arg]; ok {
+		arg = alias
+	}
+
+	if alias, ok := i.typeAliases[val]; ok {
+		val = alias
+	}
+
 	if arg.Generic() {
 		if bind, ok := (*typeBinds)[arg.Basic()]; ok && string(bind) != strings.TrimLeft(string(val), ":") {
 			return false, nil
@@ -820,22 +828,18 @@ func (i *Interpret) matchType(arg Type, val Type, typeBinds *map[string]Type) (b
 	if val == TypeUnknown || arg == TypeUnknown {
 		return true, nil
 	}
-	// log.Printf("typeAliases: %v, arg=%v, var=%v", i.typeAliases, arg, val)
 	if i.typeAliases[arg] == val || i.typeAliases[val] == arg {
 		return true, nil
 	}
 
-	// log.Printf("toParent: %v, %v", val, arg.Basic())
 	parent, err := i.toParent(val, Type(arg.Basic()))
 	if err != nil {
-		// log.Printf("toParent failed: %v", err)
 		return false, err
 	}
 
 	aParams := arg.Arguments()
 	vParams := parent.Arguments()
 	if len(aParams) != len(vParams) {
-		// log.Printf("return false")
 		return false, nil
 	}
 	for j, p := range aParams {

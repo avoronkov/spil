@@ -66,7 +66,7 @@ func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
 		TypeUnknown: "",
 		TypeAny:     "",
 		TypeInt:     TypeAny,
-		TypeStr:     TypeList,
+		TypeStr:     "list[str]",
 		TypeBool:    TypeAny,
 		TypeFunc:    TypeAny,
 		"list[a]":   TypeAny,
