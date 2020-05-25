@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -25,7 +26,7 @@ func TestExamples(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				dir, file := filepath.Split(test)
 				output := filepath.Join(dir, "out"+file[2:])
-				checkInterpreter(t, test, output, false, bigint)
+				checkInterpreter(t, test, output, bigint)
 			})
 		}
 	}
@@ -45,13 +46,13 @@ func TestBuiltin(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				dir, file := filepath.Split(test)
 				output := filepath.Join(dir, "output."+file)
-				checkInterpreter(t, test, output, true, bigint)
+				checkInterpreter(t, test, output, bigint)
 			})
 		}
 	}
 }
 
-func checkInterpreter(t *testing.T, input, output string, builtin, bigint bool) {
+func checkInterpreter(t *testing.T, input, output string, bigint bool) {
 	fin, err := os.Open(input)
 	if err != nil {
 		t.Fatalf("Cannot open input file: %v", err)
@@ -66,13 +67,8 @@ func checkInterpreter(t *testing.T, input, output string, builtin, bigint bool) 
 		t.Fatalf("Reading output file failed: %v", err)
 	}
 
-	builtinDir := ""
-	if builtin {
-		builtinDir = "./builtin"
-	}
-
 	buffer := &strings.Builder{}
-	in := NewInterpreter(buffer, builtinDir)
+	in := NewInterpreter(buffer, getTestLibraryDir())
 	in.UseBigInt(bigint)
 
 	inputPath, err := filepath.Abs(input)
@@ -96,4 +92,9 @@ func run(i *Interpret, file string, input io.Reader) error {
 		return fmt.Errorf("Check failed: %v", err)
 	}
 	return i.Run()
+}
+
+func getTestLibraryDir() string {
+	_, filename, _, _ := runtime.Caller(0)
+	return filepath.Join(filepath.Dir(filename), "library")
 }

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -182,7 +181,7 @@ func (f *FuncRuntime) bind(params []Param) (impl *FuncImpl, result *Param, resul
 	if impl.memo {
 		keyArgs, err := keyOfArgs(args)
 		if err != nil {
-			log.Printf("Cannot compute hash of args: %v, %v", args, err)
+			fmt.Fprintf(os.Stderr, "Cannot compute hash of args: %v, %v\n", args, err)
 		} else if res, ok := impl.results[keyArgs]; ok {
 			return nil, res, "", nil
 		}
@@ -637,7 +636,7 @@ func (f *FuncRuntime) evalLambda(se *Sexpr) (Expr, error) {
 	name := f.fi.interpret.NewLambdaName()
 	fi := NewFuncInterpret(f.fi.interpret, name)
 	body := f.replaceVars(se.List, fi)
-	fi.AddImpl(nil, body, false, TypeAny)
+	fi.AddImpl(nil, body, false, TypeUnknown)
 	f.fi.interpret.funcs[name] = fi
 	return Ident(name), nil
 }
@@ -707,29 +706,16 @@ func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []Param) (result 
 	}
 	for i, arg := range argfmt.Args {
 		param := params[i]
-		// log.Printf("matchType(%v, %v, %v)", arg.T, param.T, typeBinds)
 		match, err := f.interpret.matchType(arg.T, param.T, &typeBinds)
 		if err != nil {
-			// log.Printf("error: %v", err)
 			return false, nil
 		}
 		if !match {
-			// log.Printf("return false 1")
 			return false, nil
 		}
 		if !f.matchValue(&arg, &param) {
-			// log.Printf("return false 2")
 			return false, nil
 		}
-		/*
-			if arg.T.Generic() {
-				if binded, ok := typeBinds[arg.T]; ok && binded != param.T {
-					fmt.Fprintf(os.Stderr, "Generic type %v is already binded to %v: cannot match %v\n", arg.T, binded, param.T)
-					return false, nil
-				}
-				typeBinds[arg.T] = param.T
-			}
-		*/
 		if arg.Name == "" {
 			continue
 		}
@@ -777,7 +763,6 @@ func (f *FuncInterpret) matchParam(a *Arg, p *Param) bool {
 			return false
 		}
 		if !canConvert && p.T != TypeUnknown {
-			// log.Printf("cannot convert...")
 			return false
 		}
 	}
@@ -800,10 +785,10 @@ func (f *FuncRuntime) cleanup() {
 			f.fi.interpret.DeleteLambda(string(a))
 		case io.Closer:
 			if err := a.Close(); err != nil {
-				log.Printf("Close() failed: %v", err)
+				fmt.Fprintf(os.Stderr, "Close() failed: %v\n", err)
 			}
 		default:
-			log.Printf("Don't know how to clean variable of type: %v", expr)
+			fmt.Fprintf(os.Stderr, "Don't know how to clean variable of type: %v\n", expr)
 		}
 	}
 	f.scopedVars = f.scopedVars[:0]

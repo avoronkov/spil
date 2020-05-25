@@ -122,64 +122,34 @@ func FMod(args []Param) (*Param, error) {
 	return &Param{V: a.Mod(b), T: TypeInt}, nil
 }
 
-func FLess(args []Param) (*Param, error) {
+func FIntLess(args []Param) (*Param, error) {
 	if len(args) != 2 {
-		return nil, fmt.Errorf("FLess: expected 2 arguments, found %v", args)
+		return nil, fmt.Errorf("FIntLess: expected 2 arguments, found %v", args)
 	}
 	a, ok := args[0].V.(Int)
 	if !ok {
-		return nil, fmt.Errorf("FLess: first argument should be integer, found %v", args[0])
+		return nil, fmt.Errorf("FIntLess: first argument should be integer, found %v", args[0])
 	}
 	b, ok := args[1].V.(Int)
 	if !ok {
-		return nil, fmt.Errorf("FLess: second argument should be integer, found %v", args[1])
+		return nil, fmt.Errorf("FIntLess: second argument should be integer, found %v", args[1])
 	}
 	return &Param{V: Bool(a.Less(b)), T: TypeBool}, nil
 }
 
-func FLessEq(args []Param) (*Param, error) {
+func FStrLess(args []Param) (*Param, error) {
 	if len(args) != 2 {
-		return nil, fmt.Errorf("FLess: expected 2 arguments, found %v", args)
+		return nil, fmt.Errorf("FStrLess: expected 2 arguments, found %v", args)
 	}
-	a, ok := args[0].V.(Int)
+	a, ok := args[0].V.(Str)
 	if !ok {
-		return nil, fmt.Errorf("FLess: first argument should be integer, found %v", args[0])
+		return nil, fmt.Errorf("FStrLess: first argument should be string, found %v", args[0])
 	}
-	b, ok := args[1].V.(Int)
+	b, ok := args[1].V.(Str)
 	if !ok {
-		return nil, fmt.Errorf("FLess: second argument should be integer, found %v", args[1])
+		return nil, fmt.Errorf("FStrLess: second argument should be string, found %v", args[1])
 	}
-	return &Param{V: Bool(!b.Less(a)), T: TypeBool}, nil
-}
-
-func FMore(args []Param) (*Param, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("FMore: expected 2 arguments, found %v", args)
-	}
-	a, ok := args[0].V.(Int)
-	if !ok {
-		return nil, fmt.Errorf("FMore: first argument should be integer, found %v", args[0])
-	}
-	b, ok := args[1].V.(Int)
-	if !ok {
-		return nil, fmt.Errorf("FMore: second argument should be integer, found %v", args[1])
-	}
-	return &Param{V: Bool(b.Less(a)), T: TypeBool}, nil
-}
-
-func FMoreEq(args []Param) (*Param, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("FMore: expected 2 arguments, found %v", args)
-	}
-	a, ok := args[0].V.(Int)
-	if !ok {
-		return nil, fmt.Errorf("FMore: first argument should be integer, found %v", args[0])
-	}
-	b, ok := args[1].V.(Int)
-	if !ok {
-		return nil, fmt.Errorf("FMore: second argument should be integer, found %v", args[1])
-	}
-	return &Param{V: Bool(!a.Less(b)), T: TypeBool}, nil
+	return &Param{V: Bool(string(a) < string(b)), T: TypeBool}, nil
 }
 
 func FEq(args []Param) (*Param, error) {
@@ -187,67 +157,6 @@ func FEq(args []Param) (*Param, error) {
 		return nil, fmt.Errorf("FEq: expected 2 arguments, found %v", args)
 	}
 	return &Param{V: Bool(Equal(args[0].V, args[1].V)), T: TypeBool}, nil
-	/*
-		switch a := args[0].V.(type) {
-		case Int:
-			b, ok := args[1].V.(Int)
-			if !ok {
-				return nil, fmt.Errorf("FEq: Expected second argument to be Int, found %v", args[1])
-			}
-			return Bool(a.Eq(b)), nil
-		case Str:
-			b, ok := args[1].V.(Str)
-			if !ok {
-				return nil, fmt.Errorf("FEq: Expected second argument to be Str, found %v", args[1])
-			}
-			return Bool(a == b), nil
-		case Ident:
-			b, ok := args[1].V.(Ident)
-			if !ok {
-				return nil, fmt.Errorf("FEq: Expected second argument to be Ident, found %v", args[1])
-			}
-			return Bool(a == b), nil
-		case Bool:
-			b, ok := args[1].V.(Bool)
-			if !ok {
-				return nil, fmt.Errorf("FEq: Expected second argument to be Bool, found %v", args[1])
-			}
-			return Bool(a == b), nil
-		case *Sexpr:
-			b, ok := args[1].V.(*Sexpr)
-			if ok {
-				if len(a.List) != len(b.List) {
-					return Bool(false), nil
-				}
-				for i, first := range a.List {
-					cmp, _ := FEq([]Param{first, b.List[i]})
-					if cmp != Bool(true) {
-						return Bool(false), nil
-					}
-				}
-				return Bool(true), nil
-			}
-			if !a.Empty() {
-				return nil, fmt.Errorf("FEq: Expected second argument to be List, found %v", args[1])
-			}
-			l, ok := args[1].V.(*LazyList)
-			if !ok {
-				return nil, fmt.Errorf("FEq: Expected second argument to be List or Lazy List, found %v", args[1])
-			}
-			return Bool(l.Empty()), nil
-		case *LazyList:
-			// Lazy list can be compared only to '()
-			b, ok := args[1].V.(*Sexpr)
-			if !ok {
-				return nil, fmt.Errorf("FEq: Expected second argument to be '(), found %v", args[1])
-			}
-			if !b.Empty() {
-				return nil, fmt.Errorf("FEq: Cannot compare lazy list with non-empty list: %v", args[1])
-			}
-			return Bool(a.Empty()), nil
-		}
-		panic(fmt.Errorf("Unknown argument type: %v (%T)", args[0], args[0]))
-	*/
 }
 
 func FNot(args []Param) (*Param, error) {
@@ -416,6 +325,19 @@ func (in *Interpret) TwoInts(params []Param) error {
 	return in.AllInts(params)
 }
 
+func (in *Interpret) TwoStrs(params []Param) error {
+	if len(params) != 2 {
+		return fmt.Errorf("expected 2 arguments, found %v", params)
+	}
+	for i := 0; i < 2; i++ {
+		ok, err := in.matchType(TypeStr, params[i].T, &map[string]Type{})
+		if err != nil || !ok {
+			return fmt.Errorf("Cannot convert argument %d to List: %v, %w", i, params[i], err)
+		}
+	}
+	return nil
+}
+
 func TwoArgs(params []Param) error {
 	if len(params) != 2 {
 		return fmt.Errorf("expected 2 arguments, found %v", params)
@@ -446,7 +368,6 @@ func (in *Interpret) ListArg(params []Param) error {
 		return fmt.Errorf("expected 1 argument, found %v", params)
 	}
 
-	// log.Printf("ListArg: matchType(%v, %v ...) %v", TypeList, params[0].T, in.types)
 	ok, err := in.matchType("list[a]", params[0].T, &map[string]Type{})
 	if err != nil {
 		return fmt.Errorf("Cannot convert first argument to List: %w", err)

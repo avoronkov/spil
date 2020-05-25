@@ -18,7 +18,7 @@ type Interpret struct {
 	// string->filepath map to control where function was initially defined.
 	funcsOrigins map[string]string
 
-	builtinDir string
+	libraryDir string
 
 	intMaker IntMaker
 
@@ -29,38 +29,36 @@ type Interpret struct {
 	main *FuncInterpret
 }
 
-func NewInterpreter(w io.Writer, builtinDir string) *Interpret {
+func NewInterpreter(w io.Writer, libraryDir string) *Interpret {
 	i := &Interpret{
 		output:       w,
-		builtinDir:   builtinDir,
+		libraryDir:   libraryDir,
 		intMaker:     &Int64Maker{},
 		funcsOrigins: make(map[string]string),
 	}
 	i.funcs = map[string]Evaler{
-		"+":             EvalerFunc("+", FPlus, i.AllInts, TypeInt),
-		"-":             EvalerFunc("-", FMinus, i.AllInts, TypeInt),
-		"*":             EvalerFunc("*", FMultiply, i.AllInts, TypeInt),
-		"/":             EvalerFunc("/", FDiv, i.AllInts, TypeInt),
-		"mod":           EvalerFunc("mod", FMod, i.TwoInts, TypeInt),
-		"<":             EvalerFunc("<", FLess, i.TwoInts, TypeBool),
-		"<=":            EvalerFunc("<=", FLessEq, i.TwoInts, TypeBool),
-		">":             EvalerFunc(">", FMore, i.TwoInts, TypeBool),
-		">=":            EvalerFunc(">=", FMoreEq, i.TwoInts, TypeBool),
-		"=":             EvalerFunc("=", FEq, TwoArgs, TypeBool),
-		"not":           EvalerFunc("not", FNot, i.OneBoolArg, TypeBool),
-		"print":         EvalerFunc("print", i.FPrint, AnyArgs, TypeAny),
-		"head":          EvalerFunc("head", FHead, i.ListArg, TypeAny),
-		"tail":          EvalerFunc("tail", FTail, i.ListArg, TypeList),
-		"append":        EvalerFunc("append", FAppend, i.AppenderArgs, TypeList),
-		"list":          EvalerFunc("list", FList, AnyArgs, TypeList),
-		"space":         EvalerFunc("space", FSpace, i.StrArg, TypeBool),
-		"eol":           EvalerFunc("eol", FEol, i.StrArg, TypeBool),
-		"empty":         EvalerFunc("empty", FEmpty, i.ListArg, TypeBool),
-		"native.length": EvalerFunc("native.length", i.FLength, i.ListArg, TypeInt),
-		"native.nth":    EvalerFunc("native.nth", i.FNth, i.IntAndListArgs, TypeAny),
-		"int":           EvalerFunc("int", i.FInt, i.StrArg, TypeInt),
-		"open":          EvalerFunc("open", FOpen, i.StrArg, TypeStr),
-		"type":          EvalerFunc("type", FType, SingleArg, TypeStr),
+		"+":               EvalerFunc("+", FPlus, i.AllInts, TypeInt),
+		"-":               EvalerFunc("-", FMinus, i.AllInts, TypeInt),
+		"*":               EvalerFunc("*", FMultiply, i.AllInts, TypeInt),
+		"/":               EvalerFunc("/", FDiv, i.AllInts, TypeInt),
+		"mod":             EvalerFunc("mod", FMod, i.TwoInts, TypeInt),
+		"native.int.less": EvalerFunc("native.int.less", FIntLess, i.TwoInts, TypeBool),
+		"native.str.less": EvalerFunc("native.str.less", FStrLess, i.TwoStrs, TypeBool),
+		"=":               EvalerFunc("=", FEq, TwoArgs, TypeBool),
+		"not":             EvalerFunc("not", FNot, i.OneBoolArg, TypeBool),
+		"print":           EvalerFunc("print", i.FPrint, AnyArgs, TypeAny),
+		"head":            EvalerFunc("head", FHead, i.ListArg, TypeAny),
+		"tail":            EvalerFunc("tail", FTail, i.ListArg, TypeList),
+		"append":          EvalerFunc("append", FAppend, i.AppenderArgs, TypeList),
+		"list":            EvalerFunc("list", FList, AnyArgs, TypeList),
+		"space":           EvalerFunc("space", FSpace, i.StrArg, TypeBool),
+		"eol":             EvalerFunc("eol", FEol, i.StrArg, TypeBool),
+		"empty":           EvalerFunc("empty", FEmpty, i.ListArg, TypeBool),
+		"native.length":   EvalerFunc("native.length", i.FLength, i.ListArg, TypeInt),
+		"native.nth":      EvalerFunc("native.nth", i.FNth, i.IntAndListArgs, TypeAny),
+		"int":             EvalerFunc("int", i.FInt, i.StrArg, TypeInt),
+		"open":            EvalerFunc("open", FOpen, i.StrArg, TypeStr),
+		"type":            EvalerFunc("type", FType, SingleArg, TypeStr),
 	}
 	i.types = map[Type]Type{
 		TypeUnknown: "",
@@ -88,7 +86,7 @@ func (i *Interpret) UseBigInt(v bool) {
 	}
 }
 
-func (i *Interpret) loadBuiltin(dir string) error {
+func (i *Interpret) loadLibrary(dir string) error {
 	files, err := filepath.Glob(filepath.Join(dir, "*.lisp"))
 	if err != nil {
 		return fmt.Errorf("Error while loading builtins: %w", err)
@@ -177,6 +175,10 @@ L:
 }
 
 func (i *Interpret) Parse(file string, input io.Reader) error {
+	if err := i.loadLibrary(filepath.Join(i.libraryDir, "builtin")); err != nil {
+		return err
+	}
+
 	if err := i.parse(file, input); err != nil {
 		return err
 	}
@@ -270,7 +272,7 @@ func (i *Interpret) use(args []Expr) error {
 		case "bigmath":
 			i.UseBigInt(true)
 		case "std":
-			if err := i.loadBuiltin(i.builtinDir); err != nil {
+			if err := i.loadLibrary(filepath.Join(i.libraryDir, "std")); err != nil {
 				return err
 			}
 		case "strict":
@@ -586,7 +588,6 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 	case Bool:
 		return TypeBool, nil
 	case Ident:
-		// fmt.Fprintf(os.Stderr, "exprType: %v\n", a)
 		if t, ok := vars[string(a)]; ok {
 			return t, nil
 		} else if _, ok := i.funcs[string(a)]; ok {
@@ -646,7 +647,6 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 			if err != nil {
 				return u, err
 			}
-			// log.Printf("condType = %v", condType)
 			if condType != TypeBool && condType != TypeUnknown {
 				return u, fmt.Errorf("%v: condition in if-statement should return :bool, found: %v", fname, condType)
 			}
@@ -668,7 +668,6 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 		case "do":
 
 			res, err := i.evalBodyType(fname, a.List[1:], vars)
-			// log.Printf("DO: %v, %v", res, err)
 			return res, err
 		default:
 			// this is a function call
@@ -704,13 +703,15 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 						if err != nil {
 							return u, err
 						}
-						// log.Printf("append %v", itemType)
 						params = append(params, Param{T: itemType})
 					}
 				case Ident:
 					itemType, err := i.exprType(fname, item, vars)
 					if err != nil {
 						return u, err
+					}
+					if itemType.Generic() {
+						itemType = TypeUnknown
 					}
 					params = append(params, Param{T: itemType})
 				default:
@@ -730,21 +731,17 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 }
 
 func (in *Interpret) parseType(token string) (Type, error) {
-	// log.Printf("parseType(%q)", token)
 	t, ok := ParseType(token)
 	if !ok {
 		return TypeUnknown, fmt.Errorf("Token is not a type: %q", token)
 	}
 	if alias, ok := in.typeAliases[t]; ok {
 		t = alias
-		// log.Printf("parseType: token = %v", t)
 	}
-	// log.Printf("check if type exist: %v in %v", t.Canonical(), in.types)
 	_, ok = in.types[t.Canonical()]
 	if !ok {
 		return "", fmt.Errorf("Cannot parse type %v: not defined", token)
 	}
-	// log.Printf("parseType returned %v", Type(token))
 	return t, nil
 }
 

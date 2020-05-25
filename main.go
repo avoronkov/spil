@@ -37,14 +37,7 @@ func doMain() int {
 		log.SetOutput(ioutil.Discard)
 	}
 
-	builtinDir, err := getBuiltinDir()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		return 1
-	}
-	log.Printf("builtin: %v\n", builtinDir)
-
-	in := NewInterpreter(os.Stdout, builtinDir)
+	in := NewInterpreter(os.Stdout, getReleaseLibraryDir())
 	in.UseBigInt(bigint)
 
 	var file string
@@ -98,10 +91,10 @@ func main() {
 	os.Exit(doMain())
 }
 
-func getBuiltinDir() (string, error) {
+func getReleaseLibraryDir() string {
 	binPath, err := os.Executable()
 	if err != nil {
-		return "", err
+		panic(fmt.Errorf("Cannot determine librabry dir: %v", err))
 	}
-	return filepath.Join(filepath.Dir(binPath), "builtin"), nil
+	return filepath.Join(filepath.Dir(binPath), "library")
 }
