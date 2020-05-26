@@ -85,20 +85,17 @@ func (f *FuncInterpret) AddVar(name string, p *Param) {
 	f.capturedVars[name] = p
 }
 
-func (f *FuncInterpret) TryBind(params []Param) (int, Type, error) {
+func (f *FuncInterpret) TryBind(params []Param) (num int, rt Type, err error) {
 	for idx, im := range f.bodies {
 		if ok, types := f.matchParameters(im.argfmt, params); ok {
-			t := im.returnType
-			if newT, ok := types[t.Basic()]; ok {
-				t = newT
-			}
+			t := im.returnType.Expand(types)
 			if len(types) > 0 {
 				// check that generics are matching
 				values := map[string]Type{}
 				for i, arg := range im.argfmt.Args {
 					values[arg.Name] = params[i].T
 				}
-				tt, err := f.interpret.evalBodyType(f.name, im.body, values)
+				tt, err := f.interpret.evalBodyType(f.name, im.body, values, types)
 				if newTt, ok := types[tt.Basic()]; ok {
 					tt = newTt
 				}
@@ -107,7 +104,7 @@ func (f *FuncInterpret) TryBind(params []Param) (int, Type, error) {
 					return -1, "", err
 				}
 				if t != tt {
-					return -1, "", fmt.Errorf("%v: mismatch return type: %v != %v", f.name, t, tt)
+					return -1, "", fmt.Errorf("%v: mismatch return type: declared %v != actual %v", f.name, t, tt)
 				}
 			}
 			// TODO

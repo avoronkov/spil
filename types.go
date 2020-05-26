@@ -61,6 +61,29 @@ func (t Type) Canonical() Type {
 	return Type(res)
 }
 
+func (t Type) Expand(types map[string]Type) Type {
+	if types == nil {
+		return t
+	}
+	if newT, ok := types[t.Basic()]; ok {
+		return newT
+	}
+	args := t.Arguments()
+	if len(args) == 0 {
+		return t
+	}
+
+	res := t.Basic() + "["
+	for i, a := range args {
+		if i > 0 {
+			res += ","
+		}
+		res += string(Type(a).Expand(types))
+	}
+	res += "]"
+	return Type(res)
+}
+
 func ParseType(token string) (Type, bool) {
 	if strings.HasPrefix(token, ":") {
 		return Type(token[1:]), true

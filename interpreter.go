@@ -471,7 +471,7 @@ func (i *Interpret) CheckReturnTypes() (errs []error) {
 	mainArgs := map[string]Type{
 		"__stdin": TypeStr,
 	}
-	_, err := i.evalBodyType("__main__", i.mainBody, mainArgs)
+	_, err := i.evalBodyType("__main__", i.mainBody, mainArgs, nil)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -497,7 +497,7 @@ func (i *Interpret) CheckReturnTypes() (errs []error) {
 					}
 				}
 			}
-			t, err := i.evalBodyType(fi.name, impl.body, impl.argfmt.Values())
+			t, err := i.evalBodyType(fi.name, impl.body, impl.argfmt.Values(), nil)
 			if err != nil {
 				errs = append(errs, err)
 			}
@@ -512,7 +512,7 @@ func (i *Interpret) CheckReturnTypes() (errs []error) {
 	return
 }
 
-func (in *Interpret) evalBodyType(fname string, body []Expr, vars map[string]Type) (rt Type, err error) {
+func (in *Interpret) evalBodyType(fname string, body []Expr, vars map[string]Type, types map[string]Type) (rt Type, err error) {
 	if len(body) == 0 {
 		// This should be possible only for __main__ function
 		return TypeAny, err
@@ -575,7 +575,11 @@ L:
 			}
 		}
 	}
-	return in.exprType(fname, body[len(body)-1], vars)
+	rt, err = in.exprType(fname, body[len(body)-1], vars)
+	if err != nil {
+		return u, err
+	}
+	return rt.Expand(types), nil
 }
 
 func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result Type, err error) {
@@ -593,6 +597,7 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 		} else if _, ok := i.funcs[string(a)]; ok {
 			return TypeFunc, nil
 		} else if t, err := i.parseType(string(a)); err == nil {
+			//log.Printf("exprType %v = %v", e, t)
 			return t, nil
 		}
 		return u, fmt.Errorf("Undefined variable: %v", string(a))
@@ -667,7 +672,7 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 			return t1, nil
 		case "do":
 
-			res, err := i.evalBodyType(fname, a.List[1:], vars)
+			res, err := i.evalBodyType(fname, a.List[1:], vars, nil)
 			return res, err
 		default:
 			// this is a function call
