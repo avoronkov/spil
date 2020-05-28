@@ -9,7 +9,7 @@ import (
 type Evaler interface {
 	Eval([]Param) (*Param, error)
 	ReturnType() Type
-	TryBind(params []Param) (int, Type, error)
+	TryBind(params []Param) (int, Type, map[string]Type, error)
 }
 
 type nativeFunc struct {
@@ -27,11 +27,11 @@ func (n *nativeFunc) ReturnType() Type {
 	return n.ret
 }
 
-func (n *nativeFunc) TryBind(params []Param) (int, Type, error) {
+func (n *nativeFunc) TryBind(params []Param) (int, Type, map[string]Type, error) {
 	if err := n.binder(params); err != nil {
-		return -1, TypeUnknown, fmt.Errorf("%v: %v", n.name, err)
+		return -1, TypeUnknown, nil, fmt.Errorf("%v: %v", n.name, err)
 	}
-	return 0, n.ret, nil
+	return 0, n.ret, nil, nil
 }
 
 func EvalerFunc(name string, fn func([]Param) (*Param, error), binder func([]Param) error, ret Type) Evaler {
@@ -220,7 +220,7 @@ func FAppend(args []Param) (*Param, error) {
 	}
 	a, ok := args[0].V.(Appender)
 	if !ok {
-		return nil, fmt.Errorf("FAppend: expected first argument to be Appender, found %v", args[0])
+		return nil, fmt.Errorf("FAppend(1): expected first argument to be Appender, found %v", args[0])
 	}
 	return a.Append(args[1:])
 }
@@ -386,7 +386,14 @@ func (in *Interpret) AppenderArgs(params []Param) error {
 	if len(params) <= 1 {
 		return nil
 	}
-	ok, err := in.canConvertType(params[0].T, TypeList)
+	ok, err := in.matchType(Type("list[a]"), params[0].T, &map[string]Type{})
+	if ok {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	ok, err = in.canConvertType(params[0].T, TypeList)
 	if err != nil {
 		return err
 	}
@@ -401,7 +408,7 @@ func (in *Interpret) AppenderArgs(params []Param) error {
 		return nil
 	}
 	if params[0].T != TypeUnknown && !params[0].T.Generic() {
-		return fmt.Errorf("FAppend: expected first argument to be Appender, found %v", params[0])
+		return fmt.Errorf("AppenderArgs: expected first argument to be Appender, found %v", params[0])
 	}
 	return nil
 }

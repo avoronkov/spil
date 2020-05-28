@@ -64,6 +64,7 @@ func NewFuncInterpret(i *Interpret, name string) *FuncInterpret {
 }
 
 func (f *FuncInterpret) AddImpl(argfmt Expr, body []Expr, memo bool, returnType Type) error {
+	returnType = f.interpret.UnaliasType(returnType)
 	if len(f.bodies) > 0 && returnType != f.returnType {
 		return fmt.Errorf("%v: cannot redefine return type: previous %v, current %v", f.name, f.returnType, returnType)
 	}
@@ -85,7 +86,7 @@ func (f *FuncInterpret) AddVar(name string, p *Param) {
 	f.capturedVars[name] = p
 }
 
-func (f *FuncInterpret) TryBind(params []Param) (num int, rt Type, err error) {
+func (f *FuncInterpret) TryBind(params []Param) (num int, rt Type, types map[string]Type, err error) {
 	for idx, im := range f.bodies {
 		if ok, types := f.matchParameters(im.argfmt, params); ok {
 			t := im.returnType.Expand(types)
@@ -101,28 +102,29 @@ func (f *FuncInterpret) TryBind(params []Param) (num int, rt Type, err error) {
 				}
 
 				if err != nil {
-					return -1, "", err
+					return -1, "", nil, err
 				}
 				if t != tt {
-					return -1, "", fmt.Errorf("%v: mismatch return type: declared %v != actual %v", f.name, t, tt)
+					return -1, "", nil, fmt.Errorf("%v: mismatch return type: declared %v != actual %v", f.name, t, tt)
 				}
 			}
 			// TODO
-			return idx, t, nil
+			return idx, t, types, nil
 		}
 	}
-	return -1, TypeUnknown, fmt.Errorf("%v: no matching function implementation found for %v", f.name, params)
+	return -1, TypeUnknown, nil, fmt.Errorf("%v: no matching function implementation found for %v", f.name, params)
 }
 
 func (f *FuncInterpret) Eval(params []Param) (result *Param, err error) {
 	run := NewFuncRuntime(f)
-	impl, result, rt, err := run.bind(params)
+	impl, result, rt, types, err := run.bind(params)
 	if err != nil {
 		return nil, err
 	}
 	if result != nil {
 		return result, nil
 	}
+	run.types = types
 	res, err := run.Eval(impl)
 	if err != nil {
 		return nil, err
@@ -164,15 +166,15 @@ func keyOfArgs(args []Expr) (string, error) {
 	return b.String(), nil
 }
 
-func (f *FuncRuntime) bind(params []Param) (impl *FuncImpl, result *Param, resultType Type, err error) {
+func (f *FuncRuntime) bind(params []Param) (impl *FuncImpl, result *Param, resultType Type, types map[string]Type, err error) {
 	f.cleanup()
 	args := make([]Expr, 0, len(params))
 	for _, p := range params {
 		args = append(args, p.V)
 	}
-	idx, rt, err := f.fi.TryBind(params)
+	idx, rt, types, err := f.fi.TryBind(params)
 	if err != nil {
-		return nil, nil, "", err
+		return nil, nil, "", nil, err
 	}
 	impl = f.fi.bodies[idx]
 	if impl.memo {
@@ -180,7 +182,7 @@ func (f *FuncRuntime) bind(params []Param) (impl *FuncImpl, result *Param, resul
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Cannot compute hash of args: %v, %v\n", args, err)
 		} else if res, ok := impl.results[keyArgs]; ok {
-			return nil, res, "", nil
+			return nil, res, "", nil, nil
 		}
 	}
 
@@ -211,7 +213,7 @@ func (f *FuncRuntime) bind(params []Param) (impl *FuncImpl, result *Param, resul
 		f.vars[fmt.Sprintf("_%d", i+1)] = arg
 	}
 	f.args = args
-	return impl, nil, rt, nil
+	return impl, nil, rt, types, nil
 }
 
 func (f *FuncRuntime) Eval(impl *FuncImpl) (res *Param, err error) {
@@ -299,7 +301,7 @@ L:
 					args = append(args, *arg)
 				}
 				var result *Param
-				impl, result, _, err = f.bind(args)
+				impl, result, _, _, err = f.bind(args)
 				if err != nil {
 					return nil, err
 				}
@@ -315,7 +317,8 @@ L:
 			}
 		}
 	}
-	return
+	// Empty main body
+	return &Param{V: QEmpty, T: TypeList}, nil
 }
 
 func (f *FuncRuntime) lastParameter(e Expr) (*Param, *Type, error) {
@@ -387,6 +390,7 @@ func (f *FuncRuntime) lastParameter(e Expr) (*Param, *Type, error) {
 					if rt, ok := ParseType(string(id)); ok {
 						// Last statement is type declaration
 						last--
+						rt = rt.Expand(f.types)
 						retType = &rt
 					}
 				}
@@ -533,7 +537,7 @@ func (f *FuncRuntime) setVar(se *Sexpr, scoped bool) error {
 		if err != nil {
 			return err
 		}
-		value.T = t
+		value.T = t.Expand(f.types)
 	}
 	f.vars[string(name)] = *value
 	if scoped {
@@ -792,13 +796,8 @@ func (f *FuncRuntime) cleanup() {
 }
 
 func (i *Interpret) matchType(arg Type, val Type, typeBinds *map[string]Type) (result bool, eerroorr error) {
-	if alias, ok := i.typeAliases[arg]; ok {
-		arg = alias
-	}
-
-	if alias, ok := i.typeAliases[val]; ok {
-		val = alias
-	}
+	arg = i.UnaliasType(arg)
+	val = i.UnaliasType(val)
 
 	if arg.Generic() {
 		if bind, ok := (*typeBinds)[arg.Basic()]; ok && string(bind) != strings.TrimLeft(string(val), ":") {
@@ -808,9 +807,6 @@ func (i *Interpret) matchType(arg Type, val Type, typeBinds *map[string]Type) (r
 		return true, nil
 	}
 	if val == TypeUnknown || arg == TypeUnknown {
-		return true, nil
-	}
-	if i.typeAliases[arg] == val || i.typeAliases[val] == arg {
 		return true, nil
 	}
 

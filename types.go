@@ -25,6 +25,18 @@ func (t Type) Generic() bool {
 	return len(t) == 1
 }
 
+func (t Type) HasGeneric() bool {
+	if t.Generic() {
+		return true
+	}
+	for _, a := range t.Arguments() {
+		if Type(a).HasGeneric() {
+			return true
+		}
+	}
+	return false
+}
+
 // ":list[a]" -> "list"
 func (t Type) Basic() string {
 	res := string(t)

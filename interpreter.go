@@ -311,9 +311,7 @@ func (in *Interpret) defineType(args []Expr) error {
 	if !ok {
 		return fmt.Errorf("deftype expects first argument to be new type, found: %v", args[0])
 	}
-	if alias, ok := in.typeAliases[oldType]; ok {
-		oldType = alias
-	}
+	oldType = in.UnaliasType(oldType)
 	if _, ok := in.types[oldType.Canonical()]; !ok {
 		return fmt.Errorf("Basic type does not exist: %v", oldType)
 	}
@@ -322,14 +320,9 @@ func (in *Interpret) defineType(args []Expr) error {
 }
 
 func (in *Interpret) canConvertType(from, to Type) (bool, error) {
-	from = from.Canonical()
-	to = to.Canonical()
-	if alias, ok := in.typeAliases[to]; ok {
-		to = alias
-	}
-	if alias, ok := in.typeAliases[from]; ok {
-		from = alias
-	}
+	from = in.UnaliasType(from.Canonical())
+	to = in.UnaliasType(to.Canonical())
+
 	if _, ok := in.types[to.Canonical()]; !ok {
 		return false, fmt.Errorf("Cannot convert type %v into %v: %v is not defined", from, to, to)
 	}
@@ -337,9 +330,7 @@ func (in *Interpret) canConvertType(from, to Type) (bool, error) {
 		return true, nil
 	}
 	for {
-		if alias, ok := in.typeAliases[from]; ok {
-			from = alias
-		}
+		from = in.UnaliasType(from)
 		if from == to {
 			return true, nil
 		}
@@ -579,6 +570,7 @@ L:
 	if err != nil {
 		return u, err
 	}
+	rt = in.UnaliasType(rt)
 	return rt.Expand(types), nil
 }
 
@@ -597,7 +589,6 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 		} else if _, ok := i.funcs[string(a)]; ok {
 			return TypeFunc, nil
 		} else if t, err := i.parseType(string(a)); err == nil {
-			//log.Printf("exprType %v = %v", e, t)
 			return t, nil
 		}
 		return u, fmt.Errorf("Undefined variable: %v", string(a))
@@ -666,6 +657,8 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 			if t1 == TypeUnknown || t2 == TypeUnknown {
 				return TypeUnknown, nil
 			}
+			t1 = i.UnaliasType(t1)
+			t2 = i.UnaliasType(t2)
 			if t1 != t2 {
 				return TypeAny, nil
 			}
@@ -708,6 +701,9 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 						if err != nil {
 							return u, err
 						}
+						if itemType.HasGeneric() {
+							itemType = TypeUnknown
+						}
 						params = append(params, Param{T: itemType})
 					}
 				case Ident:
@@ -715,7 +711,7 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 					if err != nil {
 						return u, err
 					}
-					if itemType.Generic() {
+					if itemType.HasGeneric() {
 						itemType = TypeUnknown
 					}
 					params = append(params, Param{T: itemType})
@@ -723,7 +719,7 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 					panic(fmt.Errorf("%v: unexpected type: %v", fname, item))
 				}
 			}
-			_, t, err := f.TryBind(params)
+			_, t, _, err := f.TryBind(params)
 			if err != nil {
 				return u, fmt.Errorf("%v: %v", fname, err)
 			}
@@ -735,14 +731,19 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 	return TypeAny, nil
 }
 
+func (in *Interpret) UnaliasType(t Type) Type {
+	if tt, ok := in.typeAliases[t]; ok {
+		return tt
+	}
+	return t
+}
+
 func (in *Interpret) parseType(token string) (Type, error) {
 	t, ok := ParseType(token)
 	if !ok {
 		return TypeUnknown, fmt.Errorf("Token is not a type: %q", token)
 	}
-	if alias, ok := in.typeAliases[t]; ok {
-		t = alias
-	}
+	t = in.UnaliasType(t)
 	_, ok = in.types[t.Canonical()]
 	if !ok {
 		return "", fmt.Errorf("Cannot parse type %v: not defined", token)
@@ -768,9 +769,7 @@ func (in *Interpret) toParent(from, parent Type) (Type, error) {
 			parent = f
 			break
 		}
-		if alias, ok := in.typeAliases[f]; ok {
-			f = alias
-		}
+		f = in.UnaliasType(f)
 		if f.Basic() == parent.Basic() {
 			parent = f
 			break
