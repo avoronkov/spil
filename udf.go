@@ -130,7 +130,11 @@ func (f *FuncInterpret) Eval(params []Param) (result *Param, err error) {
 		return nil, err
 	}
 	run.cleanup()
-	res.T = rt
+	newT, err := run.updateType(res.T, rt)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot cast type %v to %v: %v", res.T, rt, err)
+	}
+	res.T = newT
 	return res, err
 }
 
@@ -243,10 +247,18 @@ L:
 				lst, ok := e.V.(*Sexpr)
 				if !ok {
 					if forceType != nil {
-						e.T = *forceType
+						newT, err := f.updateType(e.T, *forceType)
+						if err != nil {
+							return nil, fmt.Errorf("Cannot cast %v to %v: %v", e.T, *forceType, err)
+						}
+						e.T = newT
 					}
 					if bodyForceType != nil {
-						e.T = *bodyForceType
+						newT, err := f.updateType(e.T, *bodyForceType)
+						if err != nil {
+							return nil, fmt.Errorf("Cannot cast %v to %v: %v", e.T, *bodyForceType, err)
+						}
+						e.T = newT
 					}
 					if memoImpl.memo {
 						// lets remenber the result
@@ -410,7 +422,11 @@ func (f *FuncRuntime) lastParameter(e Expr) (*Param, *Type, error) {
 				}
 				if retType != nil {
 					// TODO check matching types
-					ret.T = *retType
+					newT, err := f.updateType(ret.T, *retType)
+					if err != nil {
+						return nil, nil, fmt.Errorf("Cannot cast %v to %v: %v", ret.T, *retType, err)
+					}
+					ret.T = newT
 					ft = retType
 				}
 				return ret, ft, nil
@@ -492,11 +508,25 @@ func (f *FuncRuntime) lastParameter(e Expr) (*Param, *Type, error) {
 	panic(fmt.Errorf("%v: Unexpected Expr type: %v (%T)", f.fi.name, e, e))
 }
 
+func (f *FuncRuntime) updateType(oldT, newT Type) (Type, error) {
+	ok, err := f.fi.interpret.canConvertType(oldT, newT)
+	if err != nil {
+		return TypeUnknown, err
+	}
+	if ok {
+		return oldT, nil
+	}
+	return newT, nil
+}
+
 func (f *FuncRuntime) evalParameter(expr Expr) (p *Param, err error) {
 	var forceType *Type
 	defer func() {
 		if p != nil && forceType != nil {
-			p.T = *forceType
+			p.T, err = f.updateType(p.T, *forceType)
+			if err != nil {
+				p = nil
+			}
 		}
 	}()
 	e, ft, err := f.lastParameter(expr)
@@ -537,7 +567,11 @@ func (f *FuncRuntime) setVar(se *Sexpr, scoped bool) error {
 		if err != nil {
 			return err
 		}
-		value.T = t.Expand(f.types)
+		newT, err := f.updateType(value.T, t.Expand(f.types))
+		if err != nil {
+			return fmt.Errorf("Cannot cast type %v to %v: %v", value.T, t, err)
+		}
+		value.T = newT
 	}
 	f.vars[string(name)] = *value
 	if scoped {
