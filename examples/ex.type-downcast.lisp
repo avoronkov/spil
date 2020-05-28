@@ -14,3 +14,13 @@
 
 (print (type (get-int)))
 (print (expect-int (get-int)))
+
+(def get-int2() :any 25 :any)
+
+(print (type (get-int2)))
+(print (expect-int (get-int2)))
+
+(def thead (l:list[a]) :a (head l) :a)
+
+(print "thead:" (type (thead l)))
+(print (expect-int (thead l)))

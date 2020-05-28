@@ -234,6 +234,7 @@ L:
 			if tp, ok := ParseType(string(id)); ok {
 				// Last statement is type declaration
 				last--
+				tp = tp.Expand(f.types)
 				bodyForceType = &tp
 			}
 		}
@@ -270,10 +271,18 @@ L:
 				if lst.Quoted || lst.Length() == 0 {
 					p := &Param{V: lst, T: TypeList}
 					if forceType != nil {
-						p.T = *forceType
+						newT, err := f.updateType(p.T, *forceType)
+						if err != nil {
+							return nil, err
+						}
+						p.T = newT
 					}
 					if bodyForceType != nil {
-						p.T = *bodyForceType
+						newT, err := f.updateType(p.T, *bodyForceType)
+						if err != nil {
+							return nil, err
+						}
+						p.T = newT
 					}
 					if memoImpl.memo {
 						// lets remenber the result
@@ -289,10 +298,18 @@ L:
 						return nil, err
 					}
 					if forceType != nil {
-						result.T = *forceType
+						newT, err := f.updateType(result.T, *forceType)
+						if err != nil {
+							return nil, err
+						}
+						result.T = newT
 					}
 					if bodyForceType != nil {
-						result.T = *bodyForceType
+						newT, err := f.updateType(result.T, *bodyForceType)
+						if err != nil {
+							return nil, err
+						}
+						result.T = newT
 					}
 					if memoImpl.memo {
 						// lets remenber the result
