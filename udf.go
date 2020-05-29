@@ -793,7 +793,7 @@ func (f *FuncInterpret) matchValue(a *Arg, p *Param) bool {
 }
 
 func (f *FuncInterpret) matchParam(a *Arg, p *Param) bool {
-	if a.T.Generic() {
+	if f.interpret.IsContract(a.T) {
 		return true
 	}
 	if a.T == TypeUnknown && a.V == nil {
@@ -851,7 +851,7 @@ func (i *Interpret) matchType(arg Type, val Type, typeBinds *map[string]Type) (r
 	arg = i.UnaliasType(arg)
 	val = i.UnaliasType(val)
 
-	if arg.Generic() {
+	if i.IsContract(arg) {
 		if bind, ok := (*typeBinds)[arg.Basic()]; ok && string(bind) != strings.TrimLeft(string(val), ":") {
 			return false, nil
 		}

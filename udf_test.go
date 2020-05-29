@@ -180,6 +180,11 @@ func TestMatchParameters(t *testing.T) {
 	in := NewInterpreter(os.Stderr, getTestLibraryDir())
 	fi := NewFuncInterpret(in, "__test__")
 	in.types[Type("set")] = "list[any]"
+
+	// contracts
+	in.types["a"] = ""
+	in.contracts["a"] = struct{}{}
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			act, _ := fi.matchParameters(test.argfmt, test.args)
@@ -254,6 +259,12 @@ func TestMatchType(t *testing.T) {
 	in.types["set"] = "list[any]"
 	in.types["tset[a]"] = "list[a]"
 	in.types["intsome[a]"] = "some[int,a]"
+
+	// contracts
+	in.types["a"] = ""
+	in.types["b"] = ""
+	in.contracts["a"] = struct{}{}
+	in.contracts["b"] = struct{}{}
 
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

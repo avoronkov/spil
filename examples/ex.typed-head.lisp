@@ -1,3 +1,5 @@
+(contract :t)
+
 (def thead (l:list[t]) :t (head l) :t)
 
 (def what-type (i:int) :str "int")

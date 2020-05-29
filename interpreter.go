@@ -13,6 +13,7 @@ type Interpret struct {
 	funcs       map[string]Evaler
 	types       map[Type]Type
 	typeAliases map[Type]Type
+	contracts   map[Type]struct{}
 	mainBody    []Expr
 
 	// string->filepath map to control where function was initially defined.
@@ -35,6 +36,7 @@ func NewInterpreter(w io.Writer, libraryDir string) *Interpret {
 		libraryDir:   libraryDir,
 		intMaker:     &Int64Maker{},
 		funcsOrigins: make(map[string]string),
+		contracts:    make(map[Type]struct{}),
 	}
 	i.funcs = map[string]Evaler{
 		"+":               EvalerFunc("+", FPlus, i.AllInts, TypeInt),
@@ -68,9 +70,6 @@ func NewInterpreter(w io.Writer, libraryDir string) *Interpret {
 		TypeBool:    TypeAny,
 		TypeFunc:    TypeAny,
 		"list[a]":   TypeAny,
-	}
-	for c := 'a'; c <= 'z'; c++ {
-		i.types[Type(string(c))] = ""
 	}
 	i.typeAliases = map[Type]Type{
 		TypeList: "list[any]",
@@ -163,6 +162,12 @@ L:
 				case "deftype":
 					tail, _ := a.Tail()
 					if err := i.defineType(tail.(*Sexpr).List); err != nil {
+						return err
+					}
+					continue L
+				case "contract":
+					tail, _ := a.Tail()
+					if err := i.defineContract(tail.(*Sexpr).List); err != nil {
 						return err
 					}
 					continue L
@@ -316,6 +321,30 @@ func (in *Interpret) defineType(args []Expr) error {
 		return fmt.Errorf("Basic type does not exist: %v", oldType)
 	}
 	in.types[newType] = oldType
+	return nil
+}
+
+// (contract (:a :b :c)
+//   (fn1 ...) :return
+//   (fn2 ...) :return
+//   ...)
+func (in *Interpret) defineContract(args []Expr) error {
+	if len(args) < 1 {
+		return fmt.Errorf("Not enougn arguments to contract: %v", args)
+	}
+	switch cs := args[0].(type) {
+	case Ident:
+		t, ok := ParseType(string(cs))
+		if !ok {
+			return fmt.Errorf("Contract expect first argument to be type, found: %v", cs)
+		}
+		if _, ok := in.types[t]; ok {
+			return fmt.Errorf("Cannot define contract %v: type already exist", string(cs))
+		}
+		in.types[t] = ""
+		in.contracts[t] = struct{}{}
+	}
+	// TODO: implement contract-functions
 	return nil
 }
 
@@ -701,7 +730,7 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 						if err != nil {
 							return u, err
 						}
-						if itemType.HasGeneric() {
+						if i.IsGeneric(itemType) {
 							itemType = TypeUnknown
 						}
 						params = append(params, Param{T: itemType})
@@ -711,7 +740,7 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 					if err != nil {
 						return u, err
 					}
-					if itemType.HasGeneric() {
+					if i.IsGeneric(itemType) {
 						itemType = TypeUnknown
 					}
 					params = append(params, Param{T: itemType})
@@ -798,4 +827,21 @@ func (in *Interpret) toParent(from, parent Type) (Type, error) {
 	}
 
 	return Type(res), nil
+}
+
+func (in *Interpret) IsContract(t Type) bool {
+	_, ok := in.contracts[t]
+	return ok
+}
+
+func (in *Interpret) IsGeneric(t Type) bool {
+	if in.IsContract(t) {
+		return true
+	}
+	for _, a := range t.Arguments() {
+		if in.IsGeneric(Type(a)) {
+			return true
+		}
+	}
+	return false
 }
