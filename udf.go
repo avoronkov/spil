@@ -27,6 +27,8 @@ type FuncImpl struct {
 	results map[string]*Param
 	// return type
 	returnType Type
+	// function type
+	funcType Type
 }
 
 func NewFuncImpl(argfmt *ArgFmt, body []Expr, memo bool, returnType Type) *FuncImpl {
@@ -35,11 +37,28 @@ func NewFuncImpl(argfmt *ArgFmt, body []Expr, memo bool, returnType Type) *FuncI
 		body:       body,
 		memo:       memo,
 		returnType: returnType,
+		funcType:   makeFuncType(argfmt, returnType),
 	}
 	if memo {
 		i.results = make(map[string]*Param)
 	}
 	return i
+}
+
+func makeFuncType(argfmt *ArgFmt, retType Type) Type {
+	if argfmt == nil {
+		return TypeFunc
+	}
+	res := "func["
+	if argfmt.Wildcard != "" {
+		res += "list...,"
+	} else {
+		for _, arg := range argfmt.Args {
+			res += string(arg.T) + ","
+		}
+	}
+	res += string(retType) + "]"
+	return Type(res)
 }
 
 func (i *FuncImpl) RememberResult(name string, args []Expr, result *Param) {
@@ -859,6 +878,9 @@ func (i *Interpret) matchType(arg Type, val Type, typeBinds *map[string]Type) (r
 		return true, nil
 	}
 	if val == TypeUnknown || arg == TypeUnknown {
+		return true, nil
+	}
+	if (arg == TypeFunc && val.Basic() == "func") || (val == TypeFunc && arg.Basic() == "func") {
 		return true, nil
 	}
 

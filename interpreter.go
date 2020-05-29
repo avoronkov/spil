@@ -615,7 +615,17 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 	case Ident:
 		if t, ok := vars[string(a)]; ok {
 			return t, nil
-		} else if _, ok := i.funcs[string(a)]; ok {
+		} else if fe, ok := i.funcs[string(a)]; ok {
+			if fu, ok := fe.(*FuncInterpret); ok {
+				ft := fu.bodies[0].funcType
+				for _, impl := range fu.bodies[1:] {
+					if impl.funcType != ft {
+						ft = TypeFunc
+						break
+					}
+				}
+				return ft, nil
+			}
 			return TypeFunc, nil
 		} else if t, err := i.parseType(string(a)); err == nil {
 			return t, nil
@@ -701,6 +711,62 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 			if tvar, ok := vars[name]; ok {
 				if tvar == TypeFunc || tvar == TypeUnknown {
 					return TypeUnknown, nil
+				}
+				if tvar.Basic() == "func" {
+					args := tvar.Arguments()
+					if len(args) == 0 {
+						return u, fmt.Errorf("%v: incorrect function type of %v: %v", fname, name, tvar)
+					}
+					rt := args[len(args)-1]
+					for idx, item := range a.List[1:] {
+						switch a := item.(type) {
+						case Int:
+							if ok, err := i.canConvertType(TypeInt, Type(args[idx])); !ok || err != nil {
+								return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, Type(args[idx]), TypeInt)
+							}
+						case Str:
+							if ok, err := i.canConvertType(TypeStr, Type(args[idx])); !ok || err != nil {
+								return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, Type(args[idx]), TypeStr)
+							}
+						case Bool:
+							if ok, err := i.canConvertType(TypeBool, Type(args[idx])); !ok || err != nil {
+								return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, Type(args[idx]), TypeBool)
+							}
+						case *Sexpr:
+							if a.Empty() || a.Quoted {
+								if ok, err := i.canConvertType(TypeList, Type(args[idx])); !ok || err != nil {
+									return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, Type(args[idx]), TypeList)
+								}
+							} else if a.Lambda {
+								if ok, err := i.canConvertType(TypeFunc, Type(args[idx])); !ok || err != nil {
+									return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, Type(args[idx]), TypeFunc)
+								}
+							} else {
+								itemType, err := i.exprType(fname, item, vars)
+								if err != nil {
+									return u, err
+								}
+								if !i.IsGeneric(itemType) {
+									if ok, err := i.canConvertType(itemType, Type(args[idx])); !ok || err != nil {
+										return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, Type(args[idx]), itemType)
+									}
+								}
+							}
+						case Ident:
+							itemType, err := i.exprType(fname, item, vars)
+							if err != nil {
+								return u, err
+							}
+							if !i.IsGeneric(itemType) {
+								if ok, err := i.canConvertType(itemType, Type(args[idx])); !ok || err != nil {
+									return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, Type(args[idx]), itemType)
+								}
+							}
+						default:
+							panic(fmt.Errorf("%v: unexpected type: %v", fname, item))
+						}
+					}
+					return Type(rt), nil
 				}
 				return u, fmt.Errorf("%v: expected '%v' to be function, found: %v", fname, name, tvar)
 			}

@@ -252,6 +252,8 @@ func TestMatchType(t *testing.T) {
 		{"list-any", "any", "list", &map[string]Type{}, true},
 		{"list[a]-list", "list[a]", "list", &map[string]Type{}, true},
 		{"list[a]-list[any]", "list[a]", "list[any]", &map[string]Type{}, true},
+		{"func[a]-func", "func[a]", "func", &map[string]Type{}, true},
+		{"func-func[a]", "func", "func[a]", &map[string]Type{}, true},
 	}
 
 	in := NewInterpreter(os.Stderr, getTestLibraryDir())
