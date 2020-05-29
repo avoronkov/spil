@@ -718,6 +718,7 @@ func (f *FuncRuntime) replaceVars(st []Expr, fi *FuncInterpret) (res []Expr) {
 	return res
 }
 
+// function list-of-args
 func (f *FuncRuntime) evalApply(se *Sexpr) (Expr, error) {
 	if len(se.List) != 2 {
 		return nil, fmt.Errorf("apply expects function with list of arguments")

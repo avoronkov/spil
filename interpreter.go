@@ -47,8 +47,8 @@ func NewInterpreter(w io.Writer, libraryDir string) *Interpret {
 		"=":               EvalerFunc("=", FEq, TwoArgs, TypeBool),
 		"not":             EvalerFunc("not", FNot, i.OneBoolArg, TypeBool),
 		"print":           EvalerFunc("print", i.FPrint, AnyArgs, TypeAny),
-		"head":            EvalerFunc("head", FHead, i.ListArg, TypeAny),
-		"tail":            EvalerFunc("tail", FTail, i.ListArg, TypeList),
+		"native.head":     EvalerFunc("native.head", FHead, AnyArgs, TypeAny),
+		"native.tail":     EvalerFunc("native.tail", FTail, AnyArgs, TypeList),
 		"append":          EvalerFunc("append", FAppend, i.AppenderArgs, TypeList),
 		"list":            EvalerFunc("list", FList, AnyArgs, TypeList),
 		"space":           EvalerFunc("space", FSpace, i.StrArg, TypeBool),
@@ -627,8 +627,8 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 			if err != nil {
 				return u, err
 			}
-			if atype != TypeList && atype != TypeUnknown {
-				return u, fmt.Errorf("%v: apply expects list on second place, found: %v", fname, a.List[2])
+			if atype.Basic() != "list" && atype != TypeUnknown {
+				return u, fmt.Errorf("%v: apply expects list on second place, found: %v (%v)", fname, a.List[2], atype)
 			}
 			fi, ok := i.funcs[string(a.List[1].(Ident))]
 			if !ok {
