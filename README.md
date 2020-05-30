@@ -1,5 +1,8 @@
 # SPIL - SimPle LIsp implementation written in Go
 
+![Go](https://github.com/avoronkov/spil/workflows/Go/badge.svg)
+
+
 ## Installation
 
 ```
