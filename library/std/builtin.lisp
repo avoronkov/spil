@@ -76,16 +76,24 @@
 (def drop (0 l:list) :list l)
 (def drop (n:int l:list) :list (drop (- n 1) (tail l)))
 
+;; drop elements while condition is true
+(def drop-while (pred:func lst:list) :list
+	 ; (print "type lst = " (type lst))
+	 ; (print "type head lst = " (type (head lst)))
+	 (if (not (pred (head lst)))
+	   lst
+	   (drop-while pred (tail lst))))
+
 
 ;; take nth element from list.
 ;; Elements numeration is started from 1 (!).
 ; (def nth (n:int lst:list) :any (head (drop (- n 1) lst)))
-(def nth (n:int lst:list) :any (native.nth n lst))
+(def nth (n:int lst:list[a]) :a (native.nth n lst) :a)
 
 
-(def first  (lst:list) :any (nth 1 lst))
-(def second (lst:list) :any (nth 2 lst))
-(def third  (lst:list) :any (nth 3 lst))
+(def first  (lst:list[a]) :a (nth 1 lst))
+(def second (lst:list[a]) :a (nth 2 lst))
+(def third  (lst:list[a]) :a (nth 3 lst))
 
 
 ;; reduce

@@ -440,7 +440,7 @@ func (in *Interpret) IntAndListArgs(params []Param) error {
 		return fmt.Errorf("expected first argument to be Int, found %v", params)
 	}
 
-	ok, err = in.canConvertType(params[1].T, TypeList)
+	ok, err = in.matchType("list[a]", params[1].T, &map[string]Type{})
 	if err != nil {
 		return fmt.Errorf("Second argument is not a list: %w", err)
 	}
