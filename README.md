@@ -1,12 +1,13 @@
 # SPIL - SimPle LIsp implementation written in Go
 
 ![Go](https://github.com/avoronkov/spil/workflows/Go/badge.svg)
+[![Coverage Status](https://coveralls.io/repos/github/avoronkov/spil/badge.svg?branch=master)](https://coveralls.io/github/avoronkov/spil?branch=master)
 
 
 ## Installation
 
 ```
-$ go get gitlab.com/avoronkov/spil
+$ go get github.com/avoronkov/spil
 $ spil
 (print "hello world!")
 ^D
@@ -16,7 +17,7 @@ hello world!
 ## Language overview
 
 Well, it's a kind of Lisp, so you write you code with the contructions like that:
-```
+```Lisp
 (print (- (* 2 3) 1))
 (print (+ 1 2 3 4 5))
 (print "this is true:" 'T "and this is false:" 'F)
@@ -331,7 +332,7 @@ Note that you cannot use :list variable where :set is required, but you can pass
 
 ## Examples
 
-You can find some examples of code [here](https://gitlab.com/avoronkov/spil/-/tree/master/examples)
+You can find some examples of code [here](https://github.com/avoronkov/spil/tree/master/examples)
 
 ## TODO
 
