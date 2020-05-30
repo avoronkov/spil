@@ -521,7 +521,7 @@ func (i *Interpret) CheckReturnTypes() (errs []error) {
 			if err != nil {
 				errs = append(errs, err)
 			}
-			if fi.returnType != TypeAny && fi.returnType != TypeUnknown {
+			if fi.returnType != TypeAny && fi.returnType != TypeUnknown && !i.IsGeneric(fi.returnType) {
 				if t != fi.returnType {
 					err := fmt.Errorf("Incorrect return value in function %v(%v): expected %v actual %v", fi.name, impl.argfmt, fi.returnType, t)
 					errs = append(errs, err)
@@ -617,14 +617,7 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 			return t, nil
 		} else if fe, ok := i.funcs[string(a)]; ok {
 			if fu, ok := fe.(*FuncInterpret); ok {
-				ft := fu.bodies[0].funcType
-				for _, impl := range fu.bodies[1:] {
-					if impl.funcType != ft {
-						ft = TypeFunc
-						break
-					}
-				}
-				return ft, nil
+				return fu.FuncType(), nil
 			}
 			return TypeFunc, nil
 		} else if t, err := i.parseType(string(a)); err == nil {

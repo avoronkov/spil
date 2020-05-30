@@ -18,6 +18,17 @@ type FuncInterpret struct {
 	capturedVars map[string]*Param
 }
 
+func (f *FuncInterpret) FuncType() Type {
+	ft := f.bodies[0].funcType
+	for _, impl := range f.bodies[1:] {
+		if impl.funcType != ft {
+			ft = TypeFunc
+			break
+		}
+	}
+	return ft
+}
+
 type FuncImpl struct {
 	argfmt *ArgFmt
 	body   []Expr
@@ -378,10 +389,18 @@ func (f *FuncRuntime) lastParameter(e Expr) (*Param, *Type, error) {
 	case Bool:
 		return &Param{V: a, T: TypeBool}, nil, nil
 	case Ident:
+		result := &Param{V: a, T: TypeUnknown}
 		if value, ok := f.findVar(string(a)); ok {
-			return value, nil, nil
+			result = value
 		}
-		return &Param{V: a, T: TypeUnknown}, nil, nil
+		if id, ok := result.V.(Ident); ok {
+			if fe, ok := f.fi.interpret.funcs[string(id)]; ok {
+				if fi, ok := fe.(*FuncInterpret); ok {
+					result.T = fi.FuncType()
+				}
+			}
+		}
+		return result, nil, nil
 	case *Sexpr:
 		if a.Quoted {
 			return &Param{V: a, T: TypeList}, nil, nil
@@ -656,7 +675,7 @@ func (f *FuncRuntime) evalGen(se *Sexpr, hashable bool) (Expr, error) {
 func (f *FuncRuntime) findFunc(fname string) (result Evaler, err error) {
 	// Ability to pass function name as argument
 	if v, ok := f.findVar(fname); ok {
-		if v.T != TypeFunc && v.T != TypeUnknown {
+		if v.T.Basic() != "func" && v.T != TypeUnknown {
 			return nil, fmt.Errorf("%v: incorrect type of '%v', expected :func, found: %v", f.fi.name, fname, v)
 		}
 		vident, ok := v.V.(Ident)
