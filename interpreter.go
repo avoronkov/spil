@@ -362,6 +362,10 @@ func (in *Interpret) canConvertType(from, to Type) (bool, error) {
 	from = in.UnaliasType(from.Canonical())
 	to = in.UnaliasType(to.Canonical())
 
+	if from == TypeUnknown || to == TypeUnknown {
+		return true, nil
+	}
+
 	if _, ok := in.types[to.Canonical()]; !ok {
 		return false, fmt.Errorf("Cannot convert type %v into %v: %v is not defined", from, to, to)
 	}
