@@ -1,7 +1,7 @@
 ;; standard lisp functions
 
 ;; lazy filter
-(def filter (pred:func lst:list) :list
+(def filter (pred:func[a,bool] lst:list[a]) :list[a]
 	 (set
 	   filt
 	   (lambda
@@ -10,9 +10,9 @@
 		   (if (pred (head _1))
 			 (list (head _1) (tail _1))
 			 (self (tail _1))))))
-	 (gen filt lst))
+	 (gen filt lst) :list[a])
 
-(def filter' (pred:func lst:list) :list
+(def filter' (pred:func[a,bool] lst:list[a]) :list[a]
 	 (set
 	   filt
 	   (lambda
@@ -21,7 +21,7 @@
 		   (if (pred (head _1))
 			 (list (head _1) (tail _1))
 			 (self (tail _1))))))
-	 (gen' filt lst))
+	 (gen' filt lst) :list[a])
 
 
 ;; lazy map
@@ -44,7 +44,7 @@
 	 (gen' iter lst))
 
 ;; take first n values from list
-(def take (n:int lst:list) :list
+(def take (n:int lst:list[a]) :list[a]
 	 (set
 	   iter
 	   (lambda
@@ -54,7 +54,7 @@
 		   (if (or (= cn 0) (empty cl))
 			 '()
 			 (list (head cl) (list (- cn 1) (tail cl)))))))
-	 (gen iter (list n lst)))
+	 (gen iter (list n lst)) :list[a])
 
 ; (def take (n lst) (take n lst '()))
 ; (def take (0 lst acc) acc)
