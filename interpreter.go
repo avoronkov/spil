@@ -1,10 +1,12 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -189,7 +191,7 @@ func (i *Interpret) Parse(file string, input io.Reader) error {
 	}
 
 	i.main = NewFuncInterpret(i, "__main__")
-	if err := i.main.AddImpl(QList(Ident("__stdin")), i.mainBody, false, TypeAny); err != nil {
+	if err := i.main.AddImpl(Ident("__main_args"), i.mainBody, false, TypeAny); err != nil {
 		return err
 	}
 	return nil
@@ -203,7 +205,15 @@ func (i *Interpret) Check() []error {
 
 func (i *Interpret) Run() error {
 	stdin := NewLazyInput(os.Stdin)
-	_, err := i.main.Eval([]Param{Param{V: stdin, T: TypeStr}})
+	i.main.capturedVars["__stdin"] = &Param{V: stdin, T: TypeStr}
+	params := []Param{}
+	fargs := flag.Args()
+	if len(fargs) > 0 {
+		for _, arg := range fargs[1:] {
+			params = append(params, Param{V: Str(arg), T: TypeStr})
+		}
+	}
+	_, err := i.main.Eval(params)
 	return err
 }
 
@@ -490,6 +500,10 @@ func (in *Interpret) Stat() {
 func (i *Interpret) CheckReturnTypes() (errs []error) {
 	mainArgs := map[string]Type{
 		"__stdin": TypeStr,
+		"__args":  Type("list[str]"),
+	}
+	for i := 1; i <= 9; i++ {
+		mainArgs[fmt.Sprintf("_%d", i)] = TypeStr
 	}
 	_, err := i.evalBodyType("__main__", i.mainBody, mainArgs, nil)
 	if err != nil {
@@ -603,6 +617,8 @@ L:
 	return rt.Expand(types), nil
 }
 
+var reArg = regexp.MustCompile(`^_[0-9]+$`)
+
 func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result Type, err error) {
 	const u = TypeUnknown
 	switch a := e.(type) {
@@ -622,6 +638,9 @@ func (i *Interpret) exprType(fname string, e Expr, vars map[string]Type) (result
 			return TypeFunc, nil
 		} else if t, err := i.parseType(string(a)); err == nil {
 			return t, nil
+		}
+		if string(a) == "__args" || reArg.MatchString(string(a)) {
+			return TypeAny, nil
 		}
 		return u, fmt.Errorf("Undefined variable: %v", string(a))
 	case *Sexpr:
