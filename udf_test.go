@@ -28,37 +28,37 @@ func TestMatchParameters(t *testing.T) {
 		{
 			"empty list (2)",
 			MakeArgFmt(Arg{T: TypeList, V: QEmpty}),
-			MakeParametersFromArgs([]Expr{QList(Int64(1))}),
+			MakeParametersFromArgs([]Expr{QList(Int64Param(1))}),
 			false,
 		},
 		{
 			"any + epty list",
 			MakeArgFmt(Arg{Name: "x", T: TypeAny}, Arg{T: TypeList, V: QEmpty}),
-			MakeParametersFromArgs([]Expr{QList(Int64(1)), QEmpty}),
+			MakeParametersFromArgs([]Expr{QList(Int64Param(1)), QEmpty}),
 			true,
 		},
 		{
 			"str + epty list",
 			MakeArgFmt(Arg{Name: "x", T: TypeStr}, Arg{T: TypeList, V: QEmpty}),
-			MakeParametersFromArgs([]Expr{QList(Int64(1)), QEmpty}),
+			MakeParametersFromArgs([]Expr{QList(Int64Param(1)), QEmpty}),
 			false,
 		},
 		{
 			"wildcard",
 			MakeWildcard("args"),
-			MakeParametersFromArgs([]Expr{QList(Int64(1)), QEmpty}),
+			MakeParametersFromArgs([]Expr{QList(Int64Param(1)), QEmpty}),
 			true,
 		},
 		{
 			"any + empty list (2)",
 			MakeArgFmt(Arg{Name: "x", T: TypeAny}, Arg{T: TypeList, V: QEmpty}),
-			MakeParametersFromArgs([]Expr{QList(Int64(1)), QEmpty}),
+			MakeParametersFromArgs([]Expr{QList(Int64Param(1)), QEmpty}),
 			true,
 		},
 		{
 			"bool + empty list",
 			MakeArgFmt(Arg{Name: "x", T: TypeBool}, Arg{T: TypeList, V: QEmpty}),
-			MakeParametersFromArgs([]Expr{QList(Int64(1)), QEmpty}),
+			MakeParametersFromArgs([]Expr{QList(Int64Param(1)), QEmpty}),
 			false,
 		},
 		{

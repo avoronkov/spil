@@ -77,7 +77,7 @@ func TestNextExpr(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			hash, err := res.Hash()
+			hash, err := res.V.Hash()
 			if err != nil {
 				t.Fatal(err)
 			}

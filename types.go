@@ -134,18 +134,18 @@ func ParseArgFmt(argfmt Expr) (*ArgFmt, error) {
 		// bind arguments
 		result := &ArgFmt{}
 		for _, arg := range a.List {
-			switch r := arg.(type) {
+			switch r := arg.V.(type) {
 			case Int:
-				result.Args = append(result.Args, Arg{"", TypeInt, arg})
+				result.Args = append(result.Args, Arg{"", TypeInt, arg.V})
 			case Str:
-				result.Args = append(result.Args, Arg{"", TypeStr, arg})
+				result.Args = append(result.Args, Arg{"", TypeStr, arg.V})
 			case Bool:
-				result.Args = append(result.Args, Arg{"", TypeBool, arg})
+				result.Args = append(result.Args, Arg{"", TypeBool, arg.V})
 			case *Sexpr:
 				if !r.Empty() {
 					return nil, fmt.Errorf("Unexpected non-empty list in a list of arguments")
 				}
-				result.Args = append(result.Args, Arg{"", TypeList, arg})
+				result.Args = append(result.Args, Arg{"", TypeList, arg.V})
 			case Ident:
 				if colon := strings.Index(string(r), ":"); colon >= 0 {
 					tp, ok := ParseType(string(r)[colon:])

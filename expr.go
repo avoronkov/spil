@@ -138,12 +138,12 @@ var _ List = (*Sexpr)(nil)
 var _ Appender = (*Sexpr)(nil)
 
 type Sexpr struct {
-	List   []Expr
+	List   []Param
 	Quoted bool
 	Lambda bool
 }
 
-func QList(args ...Expr) *Sexpr {
+func QList(args ...Param) *Sexpr {
 	res := &Sexpr{Quoted: true}
 	for _, arg := range args {
 		res.List = append(res.List, arg)
@@ -163,7 +163,7 @@ func (s *Sexpr) Print(w io.Writer) {
 		if i != 0 {
 			fmt.Fprintf(w, " ")
 		}
-		item.Print(w)
+		item.V.Print(w)
 	}
 	fmt.Fprintf(w, ")")
 }
@@ -190,7 +190,7 @@ func (s *Sexpr) Hash() (string, error) {
 		fmt.Fprintf(b, "{S:")
 	}
 	for _, item := range s.List {
-		hash, err := item.Hash()
+		hash, err := item.V.Hash()
 		if err != nil {
 			return "", err
 		}
@@ -208,14 +208,14 @@ func (s *Sexpr) Nth(n int) (*Param, error) {
 	if n > len(s.List) {
 		return nil, fmt.Errorf("Index is out of range: %v", n)
 	}
-	return &Param{V: s.List[n-1], T: s.List[n-1].Type()}, nil
+	return &s.List[n-1], nil
 }
 
 func (s *Sexpr) Head() (*Param, error) {
 	if len(s.List) == 0 {
 		return nil, fmt.Errorf("Cannot perform Head() on empty list")
 	}
-	return &Param{V: s.List[0], T: s.List[0].Type()}, nil
+	return &s.List[0], nil
 }
 
 func (s *Sexpr) Tail() (List, error) {
@@ -233,13 +233,9 @@ func (s *Sexpr) Empty() bool {
 }
 
 func (s *Sexpr) Append(params []Param) (*Param, error) {
-	args := make([]Expr, 0, len(params))
-	for _, p := range params {
-		args = append(args, p.V)
-	}
 	return &Param{
 		V: &Sexpr{
-			List:   append(s.List, args...),
+			List:   append(s.List, params...),
 			Quoted: s.Quoted,
 		},
 		T: TypeList,

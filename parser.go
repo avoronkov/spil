@@ -38,38 +38,34 @@ func NewParser(r io.Reader, intParser IntParser) *Parser {
 	}
 }
 
-func (p *Parser) NextExpr() (Expr, error) {
+func (p *Parser) NextExpr() (*Param, error) {
 	token, err := p.nextToken()
 	if err != nil {
 		return nil, err
 	}
-	if token == "(" || token == "'(" {
-		item, err := p.nextSexpr( /*quoted*/ token == "'(")
+	if token == "(" || token == "'(" || token == "\\(" {
+		item, err := p.nextSexpr(token, token == "'(")
 		if err != nil {
 			return nil, err
 		}
-		if token == "'(" {
-			item.Quoted = true
-		}
 		return item, nil
 	}
-	if token == "'T" {
-		return Bool(true), nil
-	}
-	if token == "'F" {
-		return Bool(false), nil
+	if token == "'T" || token == "'F" || token == "true" || token == "false" {
+		v := token == "'T" || token == "true"
+		return &Param{V: Bool(v), T: TypeBool}, nil
 	}
 	if n, ok := p.intParser.ParseInt(token); ok {
-		return n, nil
+		return &Param{V: n, T: TypeInt}, nil
 	}
 	if s, err := ParseString(token); err == nil {
-		return s, nil
+		return &Param{V: s, T: TypeStr}, nil
 	}
-	return Ident(token), nil
+	// TODO
+	return &Param{V: Ident(token), T: TypeUnknown}, nil
 }
 
-func (p *Parser) nextSexpr(quoted bool) (*Sexpr, error) {
-	var list []Expr
+func (p *Parser) nextSexpr(leftBrace string, quoted bool) (*Param, error) {
+	var list []Param
 	for {
 		token, err := p.nextToken()
 		if err == io.EOF {
@@ -82,35 +78,37 @@ func (p *Parser) nextSexpr(quoted bool) (*Sexpr, error) {
 			break
 		}
 		if token == "(" || token == "'(" || token == "\\(" {
-			item, err := p.nextSexpr(quoted || token == "'(")
+			item, err := p.nextSexpr(token, quoted || token == "'(")
 			if err != nil {
 				return nil, err
 			}
-			if token == "\\(" {
-				item.Lambda = true
-			}
-			list = append(list, item)
+			list = append(list, *item)
 			continue
 		}
-		if token == "'T" {
-			list = append(list, Bool(true))
-			continue
-		}
-		if token == "'F" {
-			list = append(list, Bool(false))
-			continue
-		}
-		if n, ok := p.intParser.ParseInt(token); ok {
-			list = append(list, n)
-			continue
-		}
-		if s, err := ParseString(token); err == nil {
-			list = append(list, s)
-			continue
-		}
-		list = append(list, Ident(token))
+		par := p.tokenParam(token)
+		list = append(list, *par)
 	}
-	return &Sexpr{List: list, Quoted: quoted}, nil
+
+	return &Param{V: &Sexpr{
+		List:   list,
+		Quoted: quoted || leftBrace == "'(",
+		Lambda: leftBrace == "\\(",
+	}, T: TypeList}, nil
+}
+
+func (p *Parser) tokenParam(token string) *Param {
+	if token == "'T" || token == "'F" || token == "true" || token == "false" {
+		v := token == "'T" || token == "true"
+		return &Param{V: Bool(v), T: TypeBool}
+	}
+	if n, ok := p.intParser.ParseInt(token); ok {
+		return &Param{V: n, T: TypeInt}
+	}
+	if s, err := ParseString(token); err == nil {
+		return &Param{V: s, T: TypeStr}
+	}
+	// TODO
+	return &Param{V: Ident(token), T: TypeUnknown}
 }
 
 func (p *Parser) nextToken() (string, error) {

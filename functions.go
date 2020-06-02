@@ -228,7 +228,7 @@ func FAppend(args []Param) (*Param, error) {
 func FList(args []Param) (*Param, error) {
 	s := new(Sexpr)
 	for _, a := range args {
-		s.List = append(s.List, a.V)
+		s.List = append(s.List, a)
 	}
 	s.Quoted = true
 	return &Param{V: s, T: TypeList}, nil

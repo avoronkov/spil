@@ -112,11 +112,11 @@ func (l *LazyList) next() (err error) {
 	if len(res.List) == 1 {
 		// state = value
 		l.valueReady = true
-		l.value = &Param{V: res.List[0], T: res.List[0].Type()}
-		l.state = []Param{{V: res.List[0], T: res.List[0].Type()}}
+		l.value = &res.List[0]
+		l.state = []Param{res.List[0]}
 		return nil
 	}
-	p1 := &Param{V: res.List[0], T: res.List[0].Type()}
+	p1 := res.List[0]
 	tail, err := res.Tail()
 	if err != nil {
 		return err
@@ -134,7 +134,7 @@ func (l *LazyList) next() (err error) {
 		}
 	}
 	l.valueReady = true
-	l.value = p1
+	l.value = &p1
 	l.state = newState
 	return nil
 }

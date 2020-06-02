@@ -1,14 +1,15 @@
 ;; split string into words
-(def next-string (sep:str str:str) :list (next-string sep str ""))
-(def next-string (sep:str '() "") :list '())
-(def next-string (sep:str '() acc:str) :list (list acc ""))
-(def next-string (sep:str str:str acc:str) :list
+(def next-string (sep:func str:str) :list (next-string sep str ""))
+(def next-string (sep:func '() "") :list '())
+(def next-string (sep:func '() acc:str) :list (list acc ""))
+(def next-string (sep:func str:str acc:str) :list
 	 (set is-sep (sep (head str)) :bool)
+	 (set tl (do (tail str) :str))
 	 (if is-sep
 	   (if (= acc "")
-		 (next-string sep (do (tail str) :str) acc)
-		 (list acc (tail str)))
-	   (next-string sep (do (tail str) :str) (do (append acc (head str)) :str))))
+		 (next-string sep tl acc)
+		 (list acc tl))
+	   (next-string sep tl (do (append acc (head str)) :str))))
 
 
 ;; split string into lazy list of words

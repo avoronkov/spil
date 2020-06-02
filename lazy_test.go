@@ -44,14 +44,21 @@ func testCounter(args []Param) (*Param, error) {
 		return &Param{V: QEmpty, T: TypeList}, nil
 	}
 	s := &Sexpr{
-		List:   []Expr{Int64(prev + 1)},
+		List:   []Param{{V: Int64(prev + 1), T: TypeInt}},
 		Quoted: true,
 	}
 	return &Param{V: s, T: TypeList}, nil
 }
 
+func Int64Param(x int64) Param {
+	return Param{
+		V: Int64(x),
+		T: TypeInt,
+	}
+}
+
 func TestLazyListState(t *testing.T) {
-	var ll List = NewLazyList(EvalerFunc("fibGen", fibGen, AnyArgs, TypeList), []Param{{V: QList(Int64(1), Int64(1)), T: TypeList}}, false)
+	var ll List = NewLazyList(EvalerFunc("fibGen", fibGen, AnyArgs, TypeList), []Param{{V: QList(Int64Param(1), Int64Param(1)), T: TypeList}}, false)
 	res := make([]Expr, 0, 10)
 	for i := 0; i < 6; i++ {
 		val, err := ll.Head()
@@ -79,13 +86,13 @@ func TestLazyListState(t *testing.T) {
 
 func fibGen(args []Param) (*Param, error) {
 	state := args[0].V.(*Sexpr)
-	a := int64(state.List[0].(Int64))
-	b := int64(state.List[1].(Int64))
+	a := int64(state.List[0].V.(Int64))
+	b := int64(state.List[1].V.(Int64))
 	a, b = b, a+b
 	s := &Sexpr{
-		List: []Expr{
-			Int64(a),
-			QList(Int64(a), Int64(b)),
+		List: []Param{
+			Int64Param(a),
+			Param{V: QList(Int64Param(a), Int64Param(b)), T: TypeList},
 		},
 		Quoted: true,
 	}
