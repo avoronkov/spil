@@ -826,7 +826,7 @@ func (i *Interpret) exprType(fname string, e Param, vars map[string]Type) (resul
 					panic(fmt.Errorf("%v: unexpected type: %v", fname, item))
 				}
 			}
-			_, t, _, err := f.TryBind(params)
+			t, err := f.TryBindAll(params)
 			if err != nil {
 				return u, fmt.Errorf("%v: %v", fname, err)
 			}

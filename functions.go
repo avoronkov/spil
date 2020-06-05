@@ -10,6 +10,7 @@ type Evaler interface {
 	Eval([]Param) (*Param, error)
 	ReturnType() Type
 	TryBind(params []Param) (int, Type, map[string]Type, error)
+	TryBindAll(params []Param) (Type, error)
 }
 
 type nativeFunc struct {
@@ -32,6 +33,13 @@ func (n *nativeFunc) TryBind(params []Param) (int, Type, map[string]Type, error)
 		return -1, TypeUnknown, nil, fmt.Errorf("%v: %v", n.name, err)
 	}
 	return 0, n.ret, nil, nil
+}
+
+func (n *nativeFunc) TryBindAll(params []Param) (Type, error) {
+	if err := n.binder(params); err != nil {
+		return "", fmt.Errorf("%v: %v", n.name, err)
+	}
+	return n.ret, nil
 }
 
 func EvalerFunc(name string, fn func([]Param) (*Param, error), binder func([]Param) error, ret Type) Evaler {

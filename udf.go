@@ -16,6 +16,8 @@ type FuncInterpret struct {
 	bodies       []*FuncImpl
 	returnType   Type
 	capturedVars map[string]*Param
+
+	genericReturnTypes map[string]Type
 }
 
 func (f *FuncInterpret) FuncType() Type {
@@ -86,10 +88,11 @@ func (i *FuncImpl) RememberResult(name string, args []Expr, result *Param) {
 
 func NewFuncInterpret(i *Interpret, name string) *FuncInterpret {
 	return &FuncInterpret{
-		interpret:    i,
-		name:         name,
-		returnType:   TypeUnknown,
-		capturedVars: make(map[string]*Param),
+		interpret:          i,
+		name:               name,
+		returnType:         TypeUnknown,
+		capturedVars:       make(map[string]*Param),
+		genericReturnTypes: make(map[string]Type),
 	}
 }
 
@@ -116,10 +119,24 @@ func (f *FuncInterpret) AddVar(name string, p *Param) {
 	f.capturedVars[name] = p
 }
 
-func (f *FuncInterpret) TryBind(params []Param) (num int, rt Type, types map[string]Type, err error) {
-	for idx, im := range f.bodies {
+func (f *FuncInterpret) TryBindAll(params []Param) (rt Type, err error) {
+	debugf("%v: TryBindAll(%v)...", f.name, params)
+	// a bit of hack
+	hash := fmt.Sprintf("%v", params)
+	if t, ok := f.genericReturnTypes[hash]; ok {
+		return t, nil
+	}
+	f.genericReturnTypes[hash] = TypeUnknown
+
+	rtDefined := false
+	for _, im := range f.bodies {
 		if ok, types := f.matchParameters(im.argfmt, params); ok {
 			t := im.returnType.Expand(types)
+			if rtDefined && t != rt {
+				return "", fmt.Errorf("%v: different implmentations returns different type: %v != %v", f.name, rt, t)
+			}
+			rtDefined = true
+			rt = t
 			if len(types) > 0 {
 				// check that generics are matching
 				values := map[string]Type{}
@@ -132,13 +149,25 @@ func (f *FuncInterpret) TryBind(params []Param) (num int, rt Type, types map[str
 				}
 
 				if err != nil {
-					return -1, "", nil, err
+					return "", err
 				}
-				if t != tt {
-					return -1, "", nil, fmt.Errorf("%v: mismatch return type: declared %v != actual %v", f.name, t, tt)
+				if t != tt && tt != TypeUnknown {
+					return "", fmt.Errorf("%v: mismatch return type: declared %v != actual %v", f.name, t, tt)
 				}
 			}
-			// TODO
+		}
+	}
+	if !rtDefined {
+		return "", fmt.Errorf("%v: no matching function implementation found for %v", f.name, params)
+	}
+	f.genericReturnTypes[hash] = rt
+	return rt, nil
+}
+
+func (f *FuncInterpret) TryBind(params []Param) (num int, rt Type, types map[string]Type, err error) {
+	for idx, im := range f.bodies {
+		if ok, types := f.matchParameters(im.argfmt, params); ok {
+			t := im.returnType.Expand(types)
 			return idx, t, types, nil
 		}
 	}
