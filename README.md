@@ -3,10 +3,20 @@
 ![Go](https://github.com/avoronkov/spil/workflows/Go/badge.svg)
 [![Coverage Status](https://coveralls.io/repos/github/avoronkov/spil/badge.svg?branch=master)](https://coveralls.io/github/avoronkov/spil?branch=master)
 
+**Table of Contents** 
+
+- [Installation](#installation)
+- [Language overview](#language-overview)
+- [Types](#types)
+- [Static type checking](#static-type-checking)
+- [Type casting](#type-casting)
+- [User-defined types](#user-defined-types)
+- [Examples](#examples)
+- [TODO](#todo)
 
 ## Installation
 
-```
+```console
 $ go get github.com/avoronkov/spil
 $ spil
 (print "hello world!")
@@ -16,7 +26,7 @@ hello world!
 
 ## Language overview
 
-Well, it's a kind of Lisp, so you write you code with the contructions like that:
+Well, it's a kind of Lisp, so you write your code with constructions like this:
 ```Lisp
 (print (- (* 2 3) 1))
 (print (+ 1 2 3 4 5))
@@ -24,7 +34,7 @@ Well, it's a kind of Lisp, so you write you code with the contructions like that
 (print "this is a raw list:" '(1 2 3 print hello))
 ```
 
-Also it's (almost) pure functional language, so you have no mutable variables and no loops.
+Also it's an (almost) pure functional language, so you have no mutable variables and no loops.
 (Actually `print` is the only statement with side effects).
 
 ### Comments
@@ -36,29 +46,29 @@ Lines started with `;` or `#` are comments.
 SPIL (like most of other Lisps) has atoms and lists as basic data type.
 Atoms include the following:
 
-- Integers (0 1 25 1235 -128 ...)
+- Integers (`0`, `1`, `25`, `1235`, `-128`...)
 
-- Booleans ('T 'F)
+- Booleans (`'T`, `'F`)
 
-- Strings ("hello world!" "foo" "bar" ...)
+- Strings (`"hello world!"`, `"foo"`, `"bar"`...)
 
-- Identifiers (foo bar func if ...)
+- Identifiers (`foo`, `bar`, `func`, `if`,...)
 
 Lists include:
 
-- unquoted s-expressions (`(foo 1 2 3)` ... )
+- unquoted s-expressions (`(foo 1 2 3)`... )
 
 - and quoted (raw) ones (`'(this is "not" evaluated)`)
 
 ### Everything is an expression
 
-Every statement in SPIL is an expression i.e. every statement is r-value which can be returned from function or assigned to "variable".
+Every statement in SPIL is an expression, i.e. every statement is r-value which can be returned from function or assigned to "variable".
 
 ### Basic functions
 
-SPIL has the following builtin functions implemented in Go:
+SPIL has the following built-in functions implemented in Go:
 
-- `print` - prints values of expressions on stdout.
+- `print` - prints values of expressions in `stdout`.
 
 - Arithmetic operations: `+`, `-`, `*`, `/`, `mod`, `<`, `>`, `<=`, `>=`.
 
@@ -68,8 +78,8 @@ SPIL has the following builtin functions implemented in Go:
 
 ### User-defined functions
 
-You may define you own function with keyword `def` (of `func`):
-```
+You can define your own function with keyword `def` (of `func`):
+```lisp
 ; (def <function-name> <function-parameters> <body-statement1> ...)
 (def plus-one (n) (+ n 1))
 
@@ -79,10 +89,10 @@ You may define you own function with keyword `def` (of `func`):
 
 Return value of function is a return value of last expression in function.
 
-Note that `def` defined so-called "pure" function i.e. its return value can depend only on its arguments.
+Note that `def` defined so-called "pure" function, i.e. its return value can depend only on its arguments.
 
 Function may have multiple definitions with different set of arguments:
-```
+```lisp
 (def factorial (0) 1)
 (def factorial (n) (* n (factorial (- n 1))))
 ```
@@ -90,35 +100,35 @@ Function may have multiple definitions with different set of arguments:
 ### Control flows
 
 SPIL has conditional operator `if` which has the following syntax:
-```
+```lisp
 (if  some-condition  return-value-if-true return-value-if-false)
 ```
 
-Note that `if` is also an expression i.e. it has a return value.
+Note that `if` is also an expression, i.e. it has a return value.
 
 ### Recursion
 
-SPIL has no loops. Instead it uses recursion as in example above:
-```
+SPIL has no loops. Instead it uses recursion as in example below:
+```lisp
 (def factorial (0) 1)
 (def factorial (n) (* n (factorial (- n 1))))
 ```
 
 Note that such recursion is not very effective because it consumes call-stack.
 That's why it's better to use tail-call recursion like that:
-```
+```lisp
 (def factorial (n) 1)
 (def factorial (0 result) result)
 (def factorial (n result) (factorial (- n 1) (* result n)))
 ```
 SPIL has Tail Call Optimization so the result will be returned from `(factorial 0 result)` directly to the caller.
 
-If you are not familiar with recursion and tail calls you may read a great book for functional programming beginners [Learn you some Erlang for great good](https://learnyousomeerlang.com/).
+If you are not familiar with recursion and tail calls you can read a great book for functional programming beginners [Learn you some Erlang for great good](https://learnyousomeerlang.com/).
 
 ### Passing functions as arguments to other functions
 
-You may pass function as an argument by its name:
-```
+You can pass function as an argument by its name:
+```lisp
 (func plus-one (n) (+ n 1))
 
 (func apply-func-to-ten (fn) (fn 10))
@@ -130,32 +140,33 @@ You may pass function as an argument by its name:
 ### Lambdas
 
 You can define lambda-functions with `lamda` keyword.
-```
+```lisp
 (func apply-func-to-ten (fn) (fn 10))
 
 (print (apply-func-to-ten (lambda (+ _1 1))))
 ; 11
 ```
-Lambdas are very similar to regular functions but they have some difference:
+Lambdas are very similar to regular functions but they have some differences:
 
 - Lambda can grab values of variable from the context where lambda is defined:
-```
-(func apply-func-to-ten (fn) (fn 10))
 
-(set n 5)
+    ```lisp
+    (func apply-func-to-ten (fn) (fn 10))
+    
+    (set n 5)
+    
+    (print (apply-func-to-ten (lambda (+ _1 n))))
+    ; 15
+    ```
 
-(print (apply-func-to-ten (lambda (+ _1 n))))
-; 15
-```
-
-- Lambdas are designed to be small so they use short syntax of accessing arguments:
+- Lambdas are designed to be small, so they use short syntax of accessing arguments:
 `_1 _2 _3 ...` for accessing positional arguments and `__args` for accessing whole list of arguments.
 
 ### Lazy lists
 
 You can use keyword `gen` to define finite or infinite lazy lists.
-For example lazy-list of positive integers can be defined like this:
-```
+For example, a lazy-list of positive integers can be defined like this:
+```lisp
 (def inc (n) (+ n 1))
 
 ; infinite lazy list of integers: (1 2 3 4 ...)
@@ -163,9 +174,10 @@ For example lazy-list of positive integers can be defined like this:
 ```
 
 `gen` has the following syntax:
-```
+```lisp
 (gen <iterator-function> <initial-state>)
 ```
+
 When somebody asks for `head` of lazy lists then `iterator-function` is called with value of previous state.
 Iterator should return one of the following:
 
@@ -175,8 +187,8 @@ Iterator should return one of the following:
 
 - List of two elements `(list value new-state)`. `value` will be returned by `head`, `new-state` will be passed to the next call of iterator.
 
-For example the infinite list of Fibonacci numbers:
-```
+For example, an infinite list of Fibonacci numbers:
+```list
 (def next-fib (prev)
 	(set a (head prev))
 	(set b (head (tail prev)))
@@ -197,7 +209,7 @@ You can `use` other modules in your program:
 ```
 
 ### Big math
-You can use big integers instead of int64 in calculations by adding `(use bigmath)` statement and the beginning of the main module.
+You can use big integers instead of `int64` in calculations by adding `(use bigmath)` statement and the beginning of the main module.
 
 ### Memoization
 
@@ -254,8 +266,8 @@ The following builtin type are available: `:int`, `:str`, `:bool`, `:list`, `:an
 ## Static type checking
 
 SPIL checks the correctness of types usage in "compile time", i.e. before actual execution of the the program.
-You can specify option "--check" (or "-c") for syntax and type checking of the program.
-E.g. when you misplace the arguments in previous example (`(print (contains '(1 3 5 8) 4))`) you will get the following error:
+You can specify option `"--check"` (or `"-c"`) for syntax and type checking of the program.
+For example, when you misplace the arguments in previous example (`(print (contains '(1 3 5 8) 4))`) you will get the following error:
 ```
 $ spil -c example.lisp
 __main__: contains: no matching function implementation found for [{:list {S': {Int64: 1} {Int64: 3} {Int64: 5} {Int64: 8}}} {:int {Int64: 5}}]
@@ -263,8 +275,8 @@ __main__: contains: no matching function implementation found for [{:list {S': {
 
 ## Type casting
 
-Sometimes you need to cast expressions types. E.g. in the following example:
-```
+Sometimes you need to cast expressions types. Look at the following example:
+```lisp
 (def ascending? (l:list) :bool
      (if (<= (length l) 1)
        'T
@@ -274,13 +286,15 @@ Sometimes you need to cast expressions types. E.g. in the following example:
 
 (print (ascending? '(1 2 3 5 8)))
 ```
+
 you will get the error:
 ```
 ascending?: >: Expected all integer arguments, found {:any <nil>} at position 0
 ```
 because `nth` returns `:any` but `>` expects `:int`.
-So you can fix it with casting first and second elemets to `:int`:
-```
+
+So you can fix it with casting first and second elements to `:int`:
+```lisp
 (def ascending? (l:list) :bool
      (if (<= (length l) 1)
        'T
@@ -288,7 +302,8 @@ So you can fix it with casting first and second elemets to `:int`:
          'F
          (ascending? (tail l)))))
 ```
-I may look strange but actually it's rather simple. SPIL has the following forms of types casting:
+
+I may sound strange but actually it's rather simple. SPIL has the following forms of types casting:
 ```
 ; convert result of function to :int
 (def get-int () :int (function-returning-any) :int)
@@ -300,15 +315,15 @@ I may look strange but actually it's rather simple. SPIL has the following forms
 (do (function-returning-any) :int)
 ```
 
-## User defined types
+## User-defined types
 
-You may define your own type with `deftype` statement:
-```
+You can define your own type with `deftype` statement:
+```lisp
 ; (deftype new-type parent-type)
 (deftype :my-type :any)
 ```
-It may be helpful in some scenarios, i.e. if we want to implement simple "type-safe" set:
-```
+It might be helpful in some scenarios, i.e. if we want to implement simple "type-safe" set:
+```lisp
 (deftype :set :list)
 
 (def set-new () :set '() :set)
@@ -332,34 +347,34 @@ Note that you cannot use :list variable where :set is required, but you can pass
 
 ## Examples
 
-You can find some examples of code [here](https://github.com/avoronkov/spil/tree/master/examples)
+You can find some examples of code [in this repository](https://github.com/avoronkov/spil/tree/master/examples)
 
 ## TODO
 
-- [+] do-statement support
+- [x] do-statement support
 
-- [+] multiple function definition with pattern matching
+- [x] multiple function definition with pattern matching
 
-- pass command line arguments to the command
+- [ ] pass command line arguments to the command
 
-- [+] lazy lists
+- [x] lazy lists
 
-- [+] apply
+- [x] apply
 
-- [+] anonymous functions (?)
+- [x] anonymous functions (?)
 
-- [+] function "list"
+- [x] function "list"
 
-- restricted type casting and strict mode.
+- [ ] restricted type casting and strict mode.
 
-- "length" and "nth" optimization for static listst.
+- [ ] "length" and "nth" optimization for static listst.
 
-- Separate pragma parsing and loading std-lib first.
+- [ ] Separate pragma parsing and loading std-lib first.
 
-- Functions overloading for user defined types
+- [ ] Functions overloading for user defined types
 
-- "error" and "catch" functions for runtime errors
+- [ ] "error" and "catch" functions for runtime errors
 
-- Forbidden matching (:delete or something)
+- [ ] Forbidden matching (:delete or something)
 
-- Type of variable is vanished when placed into list.
+- [ ] Type of variable is vanished when placed into list.
