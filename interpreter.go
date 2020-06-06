@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"plugin"
 	"regexp"
 	"strings"
 
@@ -24,6 +25,7 @@ type Interpret struct {
 	funcsOrigins map[string]string
 
 	libraryDir string
+	PluginDir  string
 
 	intMaker types.IntMaker
 
@@ -295,11 +297,44 @@ func (i *Interpret) use(args []types.Value) error {
 		case "strict":
 			i.strictTypes = true
 		default:
-			return fmt.Errorf("Unknown use-directive: %v", string(a))
+			// try to load named plugin
+			return i.usePlugin(string(a))
 		}
 		return nil
 	}
 	return fmt.Errorf("Unexpected argument type to 'use': %v (%T)", module, module)
+}
+
+func (in *Interpret) usePlugin(name string) error {
+	filename := filepath.Join(in.PluginDir, name+".so")
+	plug, err := plugin.Open(filename)
+	if err != nil {
+		return err
+	}
+	sym, err := plug.Lookup("Types")
+	if err != nil {
+		return fmt.Errorf("Plugin %v does not define Types", filename)
+	}
+	tps := sym.(*map[types.Type]types.Type)
+	for k, v := range *tps {
+		if _, exist := in.types[k]; exist {
+			return fmt.Errorf("Cannot redefine type %v from plugin %v: type already exist", k, filename)
+		}
+		in.types[k] = v
+	}
+
+	sym, err = plug.Lookup("Funcs")
+	if err != nil {
+		return fmt.Errorf("Plugin %v does not define Types", filename)
+	}
+	fncs := sym.(*map[string]types.Function)
+	for k, v := range *fncs {
+		if _, exist := in.funcs[k]; exist {
+			return fmt.Errorf("Cannot redefine function %v from plugin %v: function already exist", k, filename)
+		}
+		in.funcs[k] = v
+	}
+	return nil
 }
 
 // (new-type) (old-type)

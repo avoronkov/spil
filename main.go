@@ -39,6 +39,7 @@ func doMain() int {
 
 	in := NewInterpreter(os.Stdout, getReleaseLibraryDir())
 	in.UseBigInt(bigint)
+	in.PluginDir = getReleasePluginDir()
 
 	var file string
 	var input io.Reader
@@ -97,4 +98,12 @@ func getReleaseLibraryDir() string {
 		panic(fmt.Errorf("Cannot determine librabry dir: %v", err))
 	}
 	return filepath.Join(filepath.Dir(binPath), "library")
+}
+
+func getReleasePluginDir() string {
+	binPath, err := os.Executable()
+	if err != nil {
+		panic(fmt.Errorf("Cannot determine plugin dir: %v", err))
+	}
+	return filepath.Join(filepath.Dir(binPath), "plugins")
 }
