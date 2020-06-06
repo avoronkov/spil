@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/avoronkov/spil/types"
 )
 
 func TestNextToken(t *testing.T) {
@@ -34,9 +36,9 @@ func TestNextToken(t *testing.T) {
 				name += "-big"
 			}
 			t.Run(name, func(t *testing.T) {
-				var intMaker IntMaker = Int64Maker{}
+				var intMaker types.IntMaker = types.Int64Maker{}
 				if bigint {
-					intMaker = BigIntMaker{}
+					intMaker = types.BigIntMaker{}
 				}
 				p := NewParser(strings.NewReader(test.input), IntParserFn(intMaker.ParseInt))
 				var tokens []string
@@ -68,16 +70,16 @@ func TestNextExpr(t *testing.T) {
 	for _, test := range testdata {
 		name := test.input
 		t.Run(name, func(t *testing.T) {
-			var intMaker IntMaker = Int64Maker{}
+			var intMaker types.IntMaker = types.Int64Maker{}
 			if bigint {
-				intMaker = BigIntMaker{}
+				intMaker = types.BigIntMaker{}
 			}
 			p := NewParser(strings.NewReader(test.input), IntParserFn(intMaker.ParseInt))
 			res, err := p.NextExpr()
 			if err != nil {
 				t.Fatal(err)
 			}
-			hash, err := res.V.Hash()
+			hash, err := res.E.Hash()
 			if err != nil {
 				t.Fatal(err)
 			}

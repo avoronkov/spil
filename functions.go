@@ -4,45 +4,40 @@ import (
 	"fmt"
 	"os"
 	"unicode"
-)
 
-type Evaler interface {
-	Eval([]Param) (*Param, error)
-	ReturnType() Type
-	TryBind(params []Param) (int, Type, map[string]Type, error)
-	TryBindAll(params []Param) (Type, error)
-}
+	"github.com/avoronkov/spil/types"
+)
 
 type nativeFunc struct {
 	name   string
-	fn     func([]Param) (*Param, error)
-	ret    Type
-	binder func([]Param) error
+	fn     func([]types.Value) (*types.Value, error)
+	ret    types.Type
+	binder func([]types.Value) error
 }
 
-func (n *nativeFunc) Eval(args []Param) (*Param, error) {
+func (n *nativeFunc) Eval(args []types.Value) (*types.Value, error) {
 	return n.fn(args)
 }
 
-func (n *nativeFunc) ReturnType() Type {
+func (n *nativeFunc) ReturnType() types.Type {
 	return n.ret
 }
 
-func (n *nativeFunc) TryBind(params []Param) (int, Type, map[string]Type, error) {
+func (n *nativeFunc) TryBind(params []types.Value) (int, types.Type, map[string]types.Type, error) {
 	if err := n.binder(params); err != nil {
-		return -1, TypeUnknown, nil, fmt.Errorf("%v: %v", n.name, err)
+		return -1, types.TypeUnknown, nil, fmt.Errorf("%v: %v", n.name, err)
 	}
 	return 0, n.ret, nil, nil
 }
 
-func (n *nativeFunc) TryBindAll(params []Param) (Type, error) {
+func (n *nativeFunc) TryBindAll(params []types.Value) (types.Type, error) {
 	if err := n.binder(params); err != nil {
 		return "", fmt.Errorf("%v: %v", n.name, err)
 	}
 	return n.ret, nil
 }
 
-func EvalerFunc(name string, fn func([]Param) (*Param, error), binder func([]Param) error, ret Type) Evaler {
+func EvalerFunc(name string, fn func([]types.Value) (*types.Value, error), binder func([]types.Value) error, ret types.Type) types.Function {
 	return &nativeFunc{
 		name:   name,
 		fn:     fn,
@@ -51,10 +46,10 @@ func EvalerFunc(name string, fn func([]Param) (*Param, error), binder func([]Par
 	}
 }
 
-func FPlus(args []Param) (*Param, error) {
-	var result Int
+func FPlus(args []types.Value) (*types.Value, error) {
+	var result types.Int
 	for i, arg := range args {
-		a, ok := arg.V.(Int)
+		a, ok := arg.E.(types.Int)
 		if !ok {
 			return nil, fmt.Errorf("FPlus: expected integer argument, found %v", arg)
 		}
@@ -64,13 +59,13 @@ func FPlus(args []Param) (*Param, error) {
 			result = result.Plus(a)
 		}
 	}
-	return &Param{V: result, T: TypeInt}, nil
+	return &types.Value{E: result, T: types.TypeInt}, nil
 }
 
-func FMinus(args []Param) (*Param, error) {
-	var result Int
+func FMinus(args []types.Value) (*types.Value, error) {
+	var result types.Int
 	for i, arg := range args {
-		a, ok := arg.V.(Int)
+		a, ok := arg.E.(types.Int)
 		if !ok {
 			return nil, fmt.Errorf("FMinus: expected integer argument in position %v, found %v", i, arg)
 		}
@@ -80,13 +75,13 @@ func FMinus(args []Param) (*Param, error) {
 			result = result.Minus(a)
 		}
 	}
-	return &Param{V: result, T: TypeInt}, nil
+	return &types.Value{E: result, T: types.TypeInt}, nil
 }
 
-func FMultiply(args []Param) (*Param, error) {
-	var result Int
+func FMultiply(args []types.Value) (*types.Value, error) {
+	var result types.Int
 	for i, arg := range args {
-		a, ok := arg.V.(Int)
+		a, ok := arg.E.(types.Int)
 		if !ok {
 			return nil, fmt.Errorf("FMultiply: expected integer argument, found %v", arg)
 		}
@@ -96,13 +91,13 @@ func FMultiply(args []Param) (*Param, error) {
 			result = result.Mult(a)
 		}
 	}
-	return &Param{V: result, T: TypeInt}, nil
+	return &types.Value{E: result, T: types.TypeInt}, nil
 }
 
-func FDiv(args []Param) (*Param, error) {
-	var result Int
+func FDiv(args []types.Value) (*types.Value, error) {
+	var result types.Int
 	for i, arg := range args {
-		a, ok := arg.V.(Int)
+		a, ok := arg.E.(types.Int)
 		if !ok {
 			return nil, fmt.Errorf("FMultiply: expected integer argument, found %v", arg)
 		}
@@ -112,88 +107,88 @@ func FDiv(args []Param) (*Param, error) {
 			result = result.Div(a)
 		}
 	}
-	return &Param{V: result, T: TypeInt}, nil
+	return &types.Value{E: result, T: types.TypeInt}, nil
 }
 
-func FMod(args []Param) (*Param, error) {
+func FMod(args []types.Value) (*types.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("FMod: expected 2 arguments, found %v", args)
 	}
-	a, ok := args[0].V.(Int)
+	a, ok := args[0].E.(types.Int)
 	if !ok {
 		return nil, fmt.Errorf("FMod: first argument should be integer, found %v", args[0])
 	}
-	b, ok := args[1].V.(Int)
+	b, ok := args[1].E.(types.Int)
 	if !ok {
 		return nil, fmt.Errorf("FMod: second argument should be integer, found %v", args[1])
 	}
-	return &Param{V: a.Mod(b), T: TypeInt}, nil
+	return &types.Value{E: a.Mod(b), T: types.TypeInt}, nil
 }
 
-func FIntLess(args []Param) (*Param, error) {
+func FIntLess(args []types.Value) (*types.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("FIntLess: expected 2 arguments, found %v", args)
 	}
-	a, ok := args[0].V.(Int)
+	a, ok := args[0].E.(types.Int)
 	if !ok {
 		return nil, fmt.Errorf("FIntLess: first argument should be integer, found %v", args[0])
 	}
-	b, ok := args[1].V.(Int)
+	b, ok := args[1].E.(types.Int)
 	if !ok {
 		return nil, fmt.Errorf("FIntLess: second argument should be integer, found %v", args[1])
 	}
-	return &Param{V: Bool(a.Less(b)), T: TypeBool}, nil
+	return &types.Value{E: types.Bool(a.Less(b)), T: types.TypeBool}, nil
 }
 
-func FStrLess(args []Param) (*Param, error) {
+func FStrLess(args []types.Value) (*types.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("FStrLess: expected 2 arguments, found %v", args)
 	}
-	a, ok := args[0].V.(Str)
+	a, ok := args[0].E.(types.Str)
 	if !ok {
 		return nil, fmt.Errorf("FStrLess: first argument should be string, found %v", args[0])
 	}
-	b, ok := args[1].V.(Str)
+	b, ok := args[1].E.(types.Str)
 	if !ok {
 		return nil, fmt.Errorf("FStrLess: second argument should be string, found %v", args[1])
 	}
-	return &Param{V: Bool(string(a) < string(b)), T: TypeBool}, nil
+	return &types.Value{E: types.Bool(string(a) < string(b)), T: types.TypeBool}, nil
 }
 
-func FEq(args []Param) (*Param, error) {
+func FEq(args []types.Value) (*types.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("FEq: expected 2 arguments, found %v", args)
 	}
-	return &Param{V: Bool(Equal(args[0].V, args[1].V)), T: TypeBool}, nil
+	return &types.Value{E: types.Bool(types.Equal(args[0].E, args[1].E)), T: types.TypeBool}, nil
 }
 
-func FNot(args []Param) (*Param, error) {
+func FNot(args []types.Value) (*types.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("FNot: expected 1 argument, found %v", args)
 	}
-	a, ok := args[0].V.(Bool)
+	a, ok := args[0].E.(types.Bool)
 	if !ok {
 		return nil, fmt.Errorf("FNot: expected argument to be Bool, found %v", args[0])
 	}
-	return &Param{V: Bool(!bool(a)), T: TypeBool}, nil
+	return &types.Value{E: types.Bool(!bool(a)), T: types.TypeBool}, nil
 }
 
-func FHead(args []Param) (*Param, error) {
+func FHead(args []types.Value) (*types.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("FHead: expected 1 argument, found %v", args)
 	}
-	a, ok := args[0].V.(List)
+	a, ok := args[0].E.(types.List)
 	if !ok {
 		return nil, fmt.Errorf("FHead: expected argument to be List, found %v", args[0])
 	}
 	return a.Head()
 }
 
-func FTail(args []Param) (*Param, error) {
+func FTail(args []types.Value) (*types.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("FTail: expected 1 argument, found %v", args)
 	}
-	a, ok := args[0].V.(List)
+	a, ok := args[0].E.(types.List)
 	if !ok {
 		return nil, fmt.Errorf("FTail: expected argument to be List, found %v", args[0])
 	}
@@ -201,82 +196,82 @@ func FTail(args []Param) (*Param, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Param{V: t, T: TypeList}, nil
+	return &types.Value{E: t, T: types.TypeList}, nil
 }
 
-func FEmpty(args []Param) (*Param, error) {
+func FEmpty(args []types.Value) (*types.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("FEmpty: expected 1 argument, found %v", args)
 	}
-	a, ok := args[0].V.(List)
+	a, ok := args[0].E.(types.List)
 	if !ok {
 		return nil, fmt.Errorf("FEmpty: expected argument to be List, found %v", args[0])
 	}
-	return &Param{V: Bool(a.Empty()), T: TypeBool}, nil
+	return &types.Value{E: types.Bool(a.Empty()), T: types.TypeBool}, nil
 }
 
 type Appender interface {
-	Append([]Param) (*Param, error)
+	Append([]types.Value) (*types.Value, error)
 }
 
-func FAppend(args []Param) (*Param, error) {
+func FAppend(args []types.Value) (*types.Value, error) {
 	if len(args) == 0 {
-		return &Param{V: QEmpty, T: TypeList}, nil
+		return &types.Value{E: types.QEmpty, T: types.TypeList}, nil
 	}
 	if len(args) == 1 {
 		return &args[0], nil
 	}
-	a, ok := args[0].V.(Appender)
+	a, ok := args[0].E.(Appender)
 	if !ok {
 		return nil, fmt.Errorf("FAppend(1): expected first argument to be Appender, found %v", args[0])
 	}
 	return a.Append(args[1:])
 }
 
-func FList(args []Param) (*Param, error) {
-	s := new(Sexpr)
+func FList(args []types.Value) (*types.Value, error) {
+	s := new(types.Sexpr)
 	for _, a := range args {
 		s.List = append(s.List, a)
 	}
 	s.Quoted = true
-	return &Param{V: s, T: TypeList}, nil
+	return &types.Value{E: s, T: types.TypeList}, nil
 }
 
 // test if symbol is white-space
-func FSpace(args []Param) (*Param, error) {
+func FSpace(args []types.Value) (*types.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("FSpace: expected exaclty one argument, found %v", args)
 	}
-	s, ok := args[0].V.(Str)
+	s, ok := args[0].E.(types.Str)
 	if !ok {
 		return nil, fmt.Errorf("FSpace: expected argument to be Str, found %v", args)
 	}
 	if len(s) != 1 {
 		return nil, fmt.Errorf("FSpace: expected argument to be Str of length 1, found %v", s)
 	}
-	return &Param{V: Bool(unicode.IsSpace(rune(string(s)[0]))), T: TypeBool}, nil
+	return &types.Value{E: types.Bool(unicode.IsSpace(rune(string(s)[0]))), T: types.TypeBool}, nil
 }
 
 // test if symbol is eol (\n)
-func FEol(args []Param) (*Param, error) {
+func FEol(args []types.Value) (*types.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("FEol: expected exaclty one argument, found %v", args)
 	}
-	s, ok := args[0].V.(Str)
+	s, ok := args[0].E.(types.Str)
 	if !ok {
 		return nil, fmt.Errorf("FEol: expected argument to be Str, found %v", args)
 	}
 	if len(s) != 1 {
 		return nil, fmt.Errorf("FEol: expected argument to be Str of length 1, found %v", s)
 	}
-	return &Param{V: Bool(s == "\n"), T: TypeBool}, nil
+	return &types.Value{E: types.Bool(s == "\n"), T: types.TypeBool}, nil
 }
 
-func FOpen(args []Param) (*Param, error) {
+func FOpen(args []types.Value) (*types.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("FOpen: expected exaclty one argument, found %v", args)
 	}
-	s, ok := args[0].V.(Str)
+	s, ok := args[0].E.(types.Str)
 	if !ok {
 		return nil, fmt.Errorf("FOpen: expected argument to be Str, found %v", args)
 	}
@@ -284,14 +279,14 @@ func FOpen(args []Param) (*Param, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Param{V: NewLazyInput(file), T: TypeStr}, nil
+	return &types.Value{E: NewLazyInput(file), T: types.TypeStr}, nil
 }
 
-func FType(args []Param) (*Param, error) {
+func FType(args []types.Value) (*types.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf(": expected exaclty one argument, found %v", args)
 	}
-	return &Param{V: Str(args[0].T.String()), T: TypeStr}, nil
+	return &types.Value{E: types.Str(args[0].T.String()), T: types.TypeStr}, nil
 }
 
 type Lenghter interface {
@@ -299,23 +294,23 @@ type Lenghter interface {
 }
 
 type Nther interface {
-	Nth(n int) (*Param, error)
+	Nth(n int) (*types.Value, error)
 }
 
 // Binders
-func SingleArg(params []Param) error {
+func SingleArg(params []types.Value) error {
 	if len(params) != 1 {
 		return fmt.Errorf("expected exaclty one argument, found %v", params)
 	}
 	return nil
 }
 
-func (in *Interpret) AllInts(params []Param) error {
+func (in *Interpret) AllInts(params []types.Value) error {
 	for i, p := range params {
-		if p.T == TypeUnknown || in.IsContract(p.T) {
+		if p.T == types.TypeUnknown || in.IsContract(p.T) {
 			continue
 		}
-		ok, err := in.canConvertType(p.T, TypeInt)
+		ok, err := in.canConvertType(p.T, types.TypeInt)
 		if err != nil {
 			return err
 		}
@@ -326,19 +321,19 @@ func (in *Interpret) AllInts(params []Param) error {
 	return nil
 }
 
-func (in *Interpret) TwoInts(params []Param) error {
+func (in *Interpret) TwoInts(params []types.Value) error {
 	if len(params) != 2 {
 		return fmt.Errorf("expected 2 arguments, found %v", params)
 	}
 	return in.AllInts(params)
 }
 
-func (in *Interpret) TwoStrs(params []Param) error {
+func (in *Interpret) TwoStrs(params []types.Value) error {
 	if len(params) != 2 {
 		return fmt.Errorf("expected 2 arguments, found %v", params)
 	}
 	for i := 0; i < 2; i++ {
-		ok, err := in.matchType(TypeStr, params[i].T, &map[string]Type{})
+		ok, err := in.matchType(types.TypeStr, params[i].T, &map[string]types.Type{})
 		if err != nil || !ok {
 			return fmt.Errorf("Cannot convert argument %d to List: %v, %w", i, params[i], err)
 		}
@@ -346,37 +341,37 @@ func (in *Interpret) TwoStrs(params []Param) error {
 	return nil
 }
 
-func TwoArgs(params []Param) error {
+func TwoArgs(params []types.Value) error {
 	if len(params) != 2 {
 		return fmt.Errorf("expected 2 arguments, found %v", params)
 	}
 	return nil
 }
 
-func (in *Interpret) OneBoolArg(params []Param) error {
+func (in *Interpret) OneBoolArg(params []types.Value) error {
 	if len(params) != 1 {
 		return fmt.Errorf("expected 1 argument, found %v", params)
 	}
-	ok, err := in.canConvertType(params[0].T, TypeBool)
+	ok, err := in.canConvertType(params[0].T, types.TypeBool)
 	if err != nil {
 		return err
 	}
-	if !ok && params[0].T != TypeUnknown && !in.IsContract(params[0].T) {
+	if !ok && params[0].T != types.TypeUnknown && !in.IsContract(params[0].T) {
 		return fmt.Errorf("expected argument to be Bool, found %v", params[0])
 	}
 	return nil
 }
 
-func AnyArgs(params []Param) error {
+func AnyArgs(params []types.Value) error {
 	return nil
 }
 
-func (in *Interpret) ListArg(params []Param) error {
+func (in *Interpret) ListArg(params []types.Value) error {
 	if len(params) != 1 {
 		return fmt.Errorf("expected 1 argument, found %v", params)
 	}
 
-	ok, err := in.matchType("list[a]", params[0].T, &map[string]Type{})
+	ok, err := in.matchType("list[a]", params[0].T, &map[string]types.Type{})
 	if err != nil {
 		return fmt.Errorf("Cannot convert first argument to List: %w", err)
 	}
@@ -384,75 +379,75 @@ func (in *Interpret) ListArg(params []Param) error {
 		return nil
 	}
 
-	if params[0].T != TypeList && params[0].T != TypeStr && params[0].T != TypeUnknown && !in.IsContract(params[0].T) {
+	if params[0].T != types.TypeList && params[0].T != types.TypeStr && params[0].T != types.TypeUnknown && !in.IsContract(params[0].T) {
 		return fmt.Errorf("expected argument to be List, found %v", params[0])
 	}
 	return nil
 }
 
-func (in *Interpret) AppenderArgs(params []Param) error {
+func (in *Interpret) AppenderArgs(params []types.Value) error {
 	if len(params) <= 1 {
 		return nil
 	}
-	ok, err := in.matchType(Type("list[a]"), params[0].T, &map[string]Type{})
+	ok, err := in.matchType(types.Type("list[a]"), params[0].T, &map[string]types.Type{})
 	if ok {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	ok, err = in.canConvertType(params[0].T, TypeList)
+	ok, err = in.canConvertType(params[0].T, types.TypeList)
 	if err != nil {
 		return err
 	}
 	if ok {
 		return nil
 	}
-	ok, err = in.canConvertType(params[0].T, TypeStr)
+	ok, err = in.canConvertType(params[0].T, types.TypeStr)
 	if err != nil {
 		return err
 	}
 	if ok {
 		return nil
 	}
-	if params[0].T != TypeUnknown && !in.IsContract(params[0].T) {
+	if params[0].T != types.TypeUnknown && !in.IsContract(params[0].T) {
 		return fmt.Errorf("AppenderArgs: expected first argument to be Appender, found %v", params[0])
 	}
 	return nil
 }
 
-func (in *Interpret) StrArg(params []Param) error {
+func (in *Interpret) StrArg(params []types.Value) error {
 	if len(params) != 1 {
 		return fmt.Errorf("expected exaclty one argument, found %v", params)
 	}
-	ok, err := in.canConvertType(params[0].T, TypeStr)
+	ok, err := in.canConvertType(params[0].T, types.TypeStr)
 	if err != nil {
 		return err
 	}
-	if !ok && params[0].T != TypeUnknown && !in.IsContract(params[0].T) {
+	if !ok && params[0].T != types.TypeUnknown && !in.IsContract(params[0].T) {
 		return fmt.Errorf("expected argument to be Str, found %v", params)
 	}
 	return nil
 }
 
-func (in *Interpret) IntAndListArgs(params []Param) error {
+func (in *Interpret) IntAndListArgs(params []types.Value) error {
 	if len(params) != 2 {
 		return fmt.Errorf("expected two arguments, found %v", params)
 	}
 
-	ok, err := in.canConvertType(params[0].T, TypeInt)
+	ok, err := in.canConvertType(params[0].T, types.TypeInt)
 	if err != nil {
 		return err
 	}
-	if !ok && params[0].T != TypeUnknown && !in.IsContract(params[0].T) {
+	if !ok && params[0].T != types.TypeUnknown && !in.IsContract(params[0].T) {
 		return fmt.Errorf("expected first argument to be Int, found %v", params)
 	}
 
-	ok, err = in.matchType("list[a]", params[1].T, &map[string]Type{})
+	ok, err = in.matchType("list[a]", params[1].T, &map[string]types.Type{})
 	if err != nil {
 		return fmt.Errorf("Second argument is not a list: %w", err)
 	}
-	if !ok && params[1].T != TypeUnknown && !in.IsContract(params[1].T) {
+	if !ok && params[1].T != types.TypeUnknown && !in.IsContract(params[1].T) {
 		return fmt.Errorf("expected second argument to be List, found %v", params)
 	}
 	return nil

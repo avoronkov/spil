@@ -8,22 +8,24 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/avoronkov/spil/types"
 )
 
 type Interpret struct {
 	output      io.Writer
-	funcs       map[string]Evaler
-	types       map[Type]Type
-	typeAliases map[Type]Type
-	contracts   map[Type]struct{}
-	mainBody    []Param
+	funcs       map[string]types.Function
+	types       map[types.Type]types.Type
+	typeAliases map[types.Type]types.Type
+	contracts   map[types.Type]struct{}
+	mainBody    []types.Value
 
 	// string->filepath map to control where function was initially defined.
 	funcsOrigins map[string]string
 
 	libraryDir string
 
-	intMaker IntMaker
+	intMaker types.IntMaker
 
 	lambdaCount int
 
@@ -36,54 +38,54 @@ func NewInterpreter(w io.Writer, libraryDir string) *Interpret {
 	i := &Interpret{
 		output:       w,
 		libraryDir:   libraryDir,
-		intMaker:     &Int64Maker{},
+		intMaker:     &types.Int64Maker{},
 		funcsOrigins: make(map[string]string),
-		contracts:    make(map[Type]struct{}),
+		contracts:    make(map[types.Type]struct{}),
 	}
-	i.funcs = map[string]Evaler{
-		"+":               EvalerFunc("+", FPlus, i.AllInts, TypeInt),
-		"-":               EvalerFunc("-", FMinus, i.AllInts, TypeInt),
-		"*":               EvalerFunc("*", FMultiply, i.AllInts, TypeInt),
-		"/":               EvalerFunc("/", FDiv, i.AllInts, TypeInt),
-		"mod":             EvalerFunc("mod", FMod, i.TwoInts, TypeInt),
-		"native.int.less": EvalerFunc("native.int.less", FIntLess, i.TwoInts, TypeBool),
-		"native.str.less": EvalerFunc("native.str.less", FStrLess, i.TwoStrs, TypeBool),
-		"=":               EvalerFunc("=", FEq, TwoArgs, TypeBool),
-		"not":             EvalerFunc("not", FNot, i.OneBoolArg, TypeBool),
-		"print":           EvalerFunc("print", i.FPrint, AnyArgs, TypeAny),
-		"native.head":     EvalerFunc("native.head", FHead, AnyArgs, TypeAny),
-		"native.tail":     EvalerFunc("native.tail", FTail, AnyArgs, TypeList),
-		"append":          EvalerFunc("append", FAppend, i.AppenderArgs, TypeList),
-		"list":            EvalerFunc("list", FList, AnyArgs, TypeList),
-		"space":           EvalerFunc("space", FSpace, i.StrArg, TypeBool),
-		"eol":             EvalerFunc("eol", FEol, i.StrArg, TypeBool),
-		"empty":           EvalerFunc("empty", FEmpty, i.ListArg, TypeBool),
-		"native.length":   EvalerFunc("native.length", i.FLength, i.ListArg, TypeInt),
-		"native.nth":      EvalerFunc("native.nth", i.FNth, i.IntAndListArgs, TypeAny),
-		"int":             EvalerFunc("int", i.FInt, i.StrArg, TypeInt),
-		"open":            EvalerFunc("open", FOpen, i.StrArg, TypeStr),
-		"type":            EvalerFunc("type", FType, SingleArg, TypeStr),
+	i.funcs = map[string]types.Function{
+		"+":               EvalerFunc("+", FPlus, i.AllInts, types.TypeInt),
+		"-":               EvalerFunc("-", FMinus, i.AllInts, types.TypeInt),
+		"*":               EvalerFunc("*", FMultiply, i.AllInts, types.TypeInt),
+		"/":               EvalerFunc("/", FDiv, i.AllInts, types.TypeInt),
+		"mod":             EvalerFunc("mod", FMod, i.TwoInts, types.TypeInt),
+		"native.int.less": EvalerFunc("native.int.less", FIntLess, i.TwoInts, types.TypeBool),
+		"native.str.less": EvalerFunc("native.str.less", FStrLess, i.TwoStrs, types.TypeBool),
+		"=":               EvalerFunc("=", FEq, TwoArgs, types.TypeBool),
+		"not":             EvalerFunc("not", FNot, i.OneBoolArg, types.TypeBool),
+		"print":           EvalerFunc("print", i.FPrint, AnyArgs, types.TypeAny),
+		"native.head":     EvalerFunc("native.head", FHead, AnyArgs, types.TypeAny),
+		"native.tail":     EvalerFunc("native.tail", FTail, AnyArgs, types.TypeList),
+		"append":          EvalerFunc("append", FAppend, i.AppenderArgs, types.TypeList),
+		"list":            EvalerFunc("list", FList, AnyArgs, types.TypeList),
+		"space":           EvalerFunc("space", FSpace, i.StrArg, types.TypeBool),
+		"eol":             EvalerFunc("eol", FEol, i.StrArg, types.TypeBool),
+		"empty":           EvalerFunc("empty", FEmpty, i.ListArg, types.TypeBool),
+		"native.length":   EvalerFunc("native.length", i.FLength, i.ListArg, types.TypeInt),
+		"native.nth":      EvalerFunc("native.nth", i.FNth, i.IntAndListArgs, types.TypeAny),
+		"int":             EvalerFunc("int", i.FInt, i.StrArg, types.TypeInt),
+		"open":            EvalerFunc("open", FOpen, i.StrArg, types.TypeStr),
+		"type":            EvalerFunc("type", FType, SingleArg, types.TypeStr),
 	}
-	i.types = map[Type]Type{
-		TypeUnknown: "",
-		TypeAny:     "",
-		TypeInt:     TypeAny,
-		TypeStr:     "list[str]",
-		TypeBool:    TypeAny,
-		TypeFunc:    TypeAny,
-		"list[a]":   TypeAny,
+	i.types = map[types.Type]types.Type{
+		types.TypeUnknown: "",
+		types.TypeAny:     "",
+		types.TypeInt:     types.TypeAny,
+		types.TypeStr:     "list[str]",
+		types.TypeBool:    types.TypeAny,
+		types.TypeFunc:    types.TypeAny,
+		"list[a]":         types.TypeAny,
 	}
-	i.typeAliases = map[Type]Type{
-		TypeList: "list[any]",
+	i.typeAliases = map[types.Type]types.Type{
+		types.TypeList: "list[any]",
 	}
 	return i
 }
 
 func (i *Interpret) UseBigInt(v bool) {
 	if v {
-		i.intMaker = &BigIntMaker{}
+		i.intMaker = &types.BigIntMaker{}
 	} else {
-		i.intMaker = &Int64Maker{}
+		i.intMaker = &types.Int64Maker{}
 	}
 }
 
@@ -119,7 +121,7 @@ func (i *Interpret) loadLibrary(dir string) error {
 	return nil
 }
 
-func (i *Interpret) ParseInt(token string) (Int, bool) {
+func (i *Interpret) ParseInt(token string) (types.Int, bool) {
 	return i.intMaker.ParseInt(token)
 }
 
@@ -134,8 +136,8 @@ L:
 		if err != nil {
 			return err
 		}
-		switch a := val.V.(type) {
-		case *Sexpr:
+		switch a := val.E.(type) {
+		case *types.Sexpr:
 			if a.Quoted {
 				return fmt.Errorf("Unexpected quoted s-expression: %v", a)
 			}
@@ -143,7 +145,7 @@ L:
 				return fmt.Errorf("Unexpected empty s-expression on top-level: %v", a)
 			}
 			head, _ := a.Head()
-			if name, ok := head.V.(Ident); ok {
+			if name, ok := head.E.(types.Ident); ok {
 				switch name {
 				case "func", "def", "func'", "def'":
 					memo := false
@@ -151,25 +153,25 @@ L:
 						memo = true
 					}
 					tail, _ := a.Tail()
-					if err := i.defineFunc(file, tail.(*Sexpr), memo); err != nil {
+					if err := i.defineFunc(file, tail.(*types.Sexpr), memo); err != nil {
 						return err
 					}
 					continue L
 				case "use":
 					tail, _ := a.Tail()
-					if err := i.use(tail.(*Sexpr).List); err != nil {
+					if err := i.use(tail.(*types.Sexpr).List); err != nil {
 						return err
 					}
 					continue L
 				case "deftype":
 					tail, _ := a.Tail()
-					if err := i.defineType(tail.(*Sexpr).List); err != nil {
+					if err := i.defineType(tail.(*types.Sexpr).List); err != nil {
 						return err
 					}
 					continue L
 				case "contract":
 					tail, _ := a.Tail()
-					if err := i.defineContract(tail.(*Sexpr).List); err != nil {
+					if err := i.defineContract(tail.(*types.Sexpr).List); err != nil {
 						return err
 					}
 					continue L
@@ -191,7 +193,7 @@ func (i *Interpret) Parse(file string, input io.Reader) error {
 	}
 
 	i.main = NewFuncInterpret(i, "__main__")
-	if err := i.main.AddImpl(Ident("__main_args"), i.mainBody, false, TypeAny); err != nil {
+	if err := i.main.AddImpl(types.Ident("__main_args"), i.mainBody, false, types.TypeAny); err != nil {
 		return err
 	}
 	return nil
@@ -205,12 +207,12 @@ func (i *Interpret) Check() []error {
 
 func (i *Interpret) Run() error {
 	stdin := NewLazyInput(os.Stdin)
-	i.main.capturedVars["__stdin"] = &Param{V: stdin, T: TypeStr}
-	params := []Param{}
+	i.main.capturedVars["__stdin"] = &types.Value{E: stdin, T: types.TypeStr}
+	params := []types.Value{}
 	fargs := flag.Args()
 	if len(fargs) > 0 {
 		for _, arg := range fargs[1:] {
-			params = append(params, Param{V: Str(arg), T: TypeStr})
+			params = append(params, types.Value{E: types.Str(arg), T: types.TypeStr})
 		}
 	}
 	_, err := i.main.Eval(params)
@@ -218,11 +220,11 @@ func (i *Interpret) Run() error {
 }
 
 // (func-name) args body...
-func (i *Interpret) defineFunc(file string, se *Sexpr, memo bool) error {
+func (i *Interpret) defineFunc(file string, se *types.Sexpr, memo bool) error {
 	if se.Length() < 3 {
 		return fmt.Errorf("Not enough arguments for function definition: %v", se)
 	}
-	name, ok := se.List[0].V.(Ident)
+	name, ok := se.List[0].E.(types.Ident)
 	if !ok {
 		return fmt.Errorf("func expected identifier first, found %v", se.List[0])
 	}
@@ -245,10 +247,10 @@ func (i *Interpret) defineFunc(file string, se *Sexpr, memo bool) error {
 		i.funcs[fname] = fi
 	}
 	bodyIndex := 2
-	returnType := TypeUnknown
+	returnType := types.TypeUnknown
 	// Check if return type is specified
-	if identType, ok := se.List[2].V.(Ident); ok {
-		returnType, ok = ParseType(string(identType))
+	if identType, ok := se.List[2].E.(types.Ident); ok {
+		returnType, ok = types.ParseType(string(identType))
 		if ok {
 			if _, err := i.parseType(string(identType)); err != nil {
 				return fmt.Errorf("%v: %v", fname, err)
@@ -257,20 +259,20 @@ func (i *Interpret) defineFunc(file string, se *Sexpr, memo bool) error {
 		}
 	}
 	// TODO
-	if err := fi.AddImpl(se.List[1].V, se.List[2:], memo, returnType); err != nil {
+	if err := fi.AddImpl(se.List[1].E, se.List[2:], memo, returnType); err != nil {
 		return err
 	}
 	i.funcsOrigins[fname] = file
 	return nil
 }
 
-func (i *Interpret) use(args []Param) error {
+func (i *Interpret) use(args []types.Value) error {
 	if len(args) != 1 {
 		return fmt.Errorf("'use' expected one argument, found: %v", args)
 	}
 	module := args[0]
-	switch a := module.V.(type) {
-	case Str:
+	switch a := module.E.(type) {
+	case types.Str:
 		f, err := os.Open(string(a))
 		if err != nil {
 			return err
@@ -282,7 +284,7 @@ func (i *Interpret) use(args []Param) error {
 			fpath = string(a)
 		}
 		return i.parse(fpath, f)
-	case Ident:
+	case types.Ident:
 		switch string(a) {
 		case "bigmath":
 			i.UseBigInt(true)
@@ -301,15 +303,15 @@ func (i *Interpret) use(args []Param) error {
 }
 
 // (new-type) (old-type)
-func (in *Interpret) defineType(args []Param) error {
+func (in *Interpret) defineType(args []types.Value) error {
 	if len(args) != 2 {
 		return fmt.Errorf("'deftype' expected two arguments, found: %v", args)
 	}
-	newId, ok := args[0].V.(Ident)
+	newId, ok := args[0].E.(types.Ident)
 	if !ok {
 		return fmt.Errorf("deftype expects first argument to be new type, found: %v", args[0])
 	}
-	newType, ok := ParseType(string(newId))
+	newType, ok := types.ParseType(string(newId))
 	if !ok {
 		return fmt.Errorf("deftype expects first argument to be new type, found: %v", args[0])
 	}
@@ -318,11 +320,11 @@ func (in *Interpret) defineType(args []Param) error {
 		return fmt.Errorf("Cannot redefine type %v", newType)
 	}
 
-	oldId, ok := args[1].V.(Ident)
+	oldId, ok := args[1].E.(types.Ident)
 	if !ok {
 		return fmt.Errorf("deftype expects first argument to be new type, found: %v", args[1])
 	}
-	oldType, ok := ParseType(string(oldId))
+	oldType, ok := types.ParseType(string(oldId))
 	if !ok {
 		return fmt.Errorf("deftype expects first argument to be new type, found: %v", args[0])
 	}
@@ -338,13 +340,13 @@ func (in *Interpret) defineType(args []Param) error {
 //   (fn1 ...) :return
 //   (fn2 ...) :return
 //   ...)
-func (in *Interpret) defineContract(args []Param) error {
+func (in *Interpret) defineContract(args []types.Value) error {
 	if len(args) < 1 {
 		return fmt.Errorf("Not enougn arguments to contract: %v", args)
 	}
-	switch cs := args[0].V.(type) {
-	case Ident:
-		t, ok := ParseType(string(cs))
+	switch cs := args[0].E.(type) {
+	case types.Ident:
+		t, ok := types.ParseType(string(cs))
 		if !ok {
 			return fmt.Errorf("Contract expect first argument to be type, found: %v", cs)
 		}
@@ -358,11 +360,11 @@ func (in *Interpret) defineContract(args []Param) error {
 	return nil
 }
 
-func (in *Interpret) canConvertType(from, to Type) (bool, error) {
+func (in *Interpret) canConvertType(from, to types.Type) (bool, error) {
 	from = in.UnaliasType(from.Canonical())
 	to = in.UnaliasType(to.Canonical())
 
-	if from == TypeUnknown || to == TypeUnknown {
+	if from == types.TypeUnknown || to == types.TypeUnknown {
 		return true, nil
 	}
 
@@ -392,27 +394,23 @@ func (in *Interpret) canConvertType(from, to Type) (bool, error) {
 	panic("Unreachable return")
 }
 
-func (in *Interpret) FPrint(args []Param) (*Param, error) {
+func (in *Interpret) FPrint(args []types.Value) (*types.Value, error) {
 	for i, e := range args {
 		if i > 0 {
 			fmt.Fprintf(in.output, " ")
 		}
-		e.V.Print(in.output)
+		e.E.Print(in.output)
 	}
 	fmt.Fprintf(in.output, "\n")
-	return &Param{V: QEmpty, T: TypeList}, nil
-}
-
-func (in *Interpret) fakeFunc(args []Expr) (Expr, error) {
-	panic("The fakeFunc should not be called")
+	return &types.Value{E: types.QEmpty, T: types.TypeList}, nil
 }
 
 // convert string into int
-func (in *Interpret) FInt(args []Param) (*Param, error) {
+func (in *Interpret) FInt(args []types.Value) (*types.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("FInt: expected exaclty one argument, found %v", args)
 	}
-	s, ok := args[0].V.(Str)
+	s, ok := args[0].E.(types.Str)
 	if !ok {
 		return nil, fmt.Errorf("FInt: expected argument to be Str, found %v", args)
 	}
@@ -420,19 +418,19 @@ func (in *Interpret) FInt(args []Param) (*Param, error) {
 	if !ok {
 		return nil, fmt.Errorf("FInt: cannot convert argument into Int: %v", s)
 	}
-	return &Param{V: i, T: TypeInt}, nil
+	return &types.Value{E: i, T: types.TypeInt}, nil
 }
 
-func (in *Interpret) FLength(args []Param) (*Param, error) {
+func (in *Interpret) FLength(args []types.Value) (*types.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("FLength: expected exaclty one argument, found %v", args)
 	}
 
-	if a, ok := args[0].V.(Lenghter); ok {
-		return &Param{V: in.intMaker.MakeInt(int64(a.Length())), T: TypeInt}, nil
+	if a, ok := args[0].E.(Lenghter); ok {
+		return &types.Value{E: in.intMaker.MakeInt(int64(a.Length())), T: types.TypeInt}, nil
 	}
 
-	a, ok := args[0].V.(List)
+	a, ok := args[0].E.(types.List)
 	if !ok {
 		return nil, fmt.Errorf("FLength: expected argument to be List, found %v", args[0])
 	}
@@ -445,22 +443,22 @@ func (in *Interpret) FLength(args []Param) (*Param, error) {
 			return nil, err
 		}
 	}
-	return &Param{V: in.intMaker.MakeInt(l), T: TypeInt}, nil
+	return &types.Value{E: in.intMaker.MakeInt(l), T: types.TypeInt}, nil
 }
 
-func (in *Interpret) FNth(args []Param) (*Param, error) {
+func (in *Interpret) FNth(args []types.Value) (*types.Value, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("FNth: expected exaclty two arguments, found %v", args)
 	}
-	bign, ok := args[0].V.(Int)
+	bign, ok := args[0].E.(types.Int)
 	if !ok {
 		return nil, fmt.Errorf("FNth: expected first argument to be Int, fount: %v", args[0])
 	}
 	n := int(bign.Int64())
-	if nther, ok := args[1].V.(Nther); ok {
+	if nther, ok := args[1].E.(Nther); ok {
 		return nther.Nth(n)
 	}
-	a, ok := args[1].V.(List)
+	a, ok := args[1].E.(types.List)
 	if !ok {
 		return nil, fmt.Errorf("FNth: expected second argument to be List, found %v", args[1])
 	}
@@ -502,12 +500,12 @@ func (in *Interpret) Stat() {
 }
 
 func (i *Interpret) CheckReturnTypes() (errs []error) {
-	mainArgs := map[string]Type{
-		"__stdin": TypeStr,
-		"__args":  Type("list[str]"),
+	mainArgs := map[string]types.Type{
+		"__stdin": types.TypeStr,
+		"__args":  types.Type("list[str]"),
 	}
 	for i := 1; i <= 9; i++ {
-		mainArgs[fmt.Sprintf("_%d", i)] = TypeStr
+		mainArgs[fmt.Sprintf("_%d", i)] = types.TypeStr
 	}
 	_, err := i.evalBodyType("__main__", i.mainBody, mainArgs, nil)
 	if err != nil {
@@ -522,13 +520,13 @@ func (i *Interpret) CheckReturnTypes() (errs []error) {
 
 		for _, impl := range fi.bodies {
 			if i.strictTypes {
-				if fi.returnType == TypeUnknown {
+				if fi.returnType == types.TypeUnknown {
 					err := fmt.Errorf("%v : %v: return type should be specified in strict mode", i.funcsOrigins[fi.name], fi.name)
 					errs = append(errs, err)
 				}
 				if impl.argfmt.Wildcard == "" {
 					for _, a := range impl.argfmt.Args {
-						if a.T == TypeUnknown {
+						if a.T == types.TypeUnknown {
 							err := fmt.Errorf("%v : %v: arument type should be specified in strict mode: %v", i.funcsOrigins[fi.name], fi.name, a.Name)
 							errs = append(errs, err)
 						}
@@ -539,7 +537,7 @@ func (i *Interpret) CheckReturnTypes() (errs []error) {
 			if err != nil {
 				errs = append(errs, err)
 			}
-			if fi.returnType != TypeAny && fi.returnType != TypeUnknown && !i.IsGeneric(fi.returnType) {
+			if fi.returnType != types.TypeAny && fi.returnType != types.TypeUnknown && !i.IsGeneric(fi.returnType) {
 				if t != fi.returnType {
 					err := fmt.Errorf("Incorrect return value in function %v(%v): expected %v actual %v", fi.name, impl.argfmt, fi.returnType, t)
 					errs = append(errs, err)
@@ -550,24 +548,24 @@ func (i *Interpret) CheckReturnTypes() (errs []error) {
 	return
 }
 
-func (in *Interpret) evalBodyType(fname string, body []Param, vars map[string]Type, types map[string]Type) (rt Type, err error) {
+func (in *Interpret) evalBodyType(fname string, body []types.Value, vars map[string]types.Type, tps map[string]types.Type) (rt types.Type, err error) {
 	if len(body) == 0 {
 		// This should be possible only for __main__ function
-		return TypeAny, err
+		return types.TypeAny, err
 	}
 
-	u := TypeUnknown
+	u := types.TypeUnknown
 L:
 	for i, stt := range body[:len(body)-1] {
 		_ = i
-		switch a := stt.V.(type) {
-		case Int, Str, Bool, Ident:
+		switch a := stt.E.(type) {
+		case types.Int, types.Str, types.Bool, types.Ident:
 			continue L
-		case *Sexpr:
+		case *types.Sexpr:
 			if a.Quoted || a.Empty() {
 				continue L
 			}
-			ident, ok := a.List[0].V.(Ident)
+			ident, ok := a.List[0].E.(types.Ident)
 			if !ok {
 				return u, fmt.Errorf("Expected ident, found: %v", a.List[0])
 			}
@@ -576,12 +574,12 @@ L:
 				if i == len(body)-1 {
 					return u, fmt.Errorf("Unexpected %v statement at the end of the function", name)
 				}
-				varname, ok := a.List[1].V.(Ident)
+				varname, ok := a.List[1].E.(types.Ident)
 				if !ok {
 					return u, fmt.Errorf("%v: second argument should be variable name, found: %v", name, a.List[1])
 				}
 				if len(a.List) == 4 {
-					id, ok := a.List[3].V.(Ident)
+					id, ok := a.List[3].E.(types.Ident)
 					if !ok {
 						return u, fmt.Errorf("Fourth statement of %v should be type identifier, found: %v", name, a.List[3])
 					}
@@ -618,43 +616,43 @@ L:
 		return u, err
 	}
 	rt = in.UnaliasType(rt)
-	return rt.Expand(types), nil
+	return rt.Expand(tps), nil
 }
 
 var reArg = regexp.MustCompile(`^_[0-9]+$`)
 
-func (i *Interpret) exprType(fname string, e Param, vars map[string]Type) (result Type, err error) {
-	const u = TypeUnknown
-	switch a := e.V.(type) {
-	case Int:
+func (i *Interpret) exprType(fname string, e types.Value, vars map[string]types.Type) (result types.Type, err error) {
+	const u = types.TypeUnknown
+	switch a := e.E.(type) {
+	case types.Int:
 		return e.T, nil
-	case Str:
+	case types.Str:
 		return e.T, nil
-	case Bool:
+	case types.Bool:
 		return e.T, nil
-	case Ident:
+	case types.Ident:
 		if t, ok := vars[string(a)]; ok {
 			return t, nil
 		} else if fe, ok := i.funcs[string(a)]; ok {
 			if fu, ok := fe.(*FuncInterpret); ok {
 				return fu.FuncType(), nil
 			}
-			return TypeFunc, nil
+			return types.TypeFunc, nil
 		} else if t, err := i.parseType(string(a)); err == nil {
 			return t, nil
 		}
 		if string(a) == "__args" || reArg.MatchString(string(a)) {
-			return TypeAny, nil
+			return types.TypeAny, nil
 		}
 		return u, fmt.Errorf("Undefined variable: %v", string(a))
-	case *Sexpr:
+	case *types.Sexpr:
 		if a.Quoted || a.Empty() {
-			return TypeList, nil
+			return types.TypeList, nil
 		}
 		if a.Lambda {
-			return TypeFunc, nil
+			return types.TypeFunc, nil
 		}
-		ident, ok := a.List[0].V.(Ident)
+		ident, ok := a.List[0].E.(types.Ident)
 		if !ok {
 			return u, fmt.Errorf("%v: expected ident, found: %v", fname, a.List[0])
 		}
@@ -662,11 +660,11 @@ func (i *Interpret) exprType(fname string, e Param, vars map[string]Type) (resul
 		case "set", "set'":
 			return u, fmt.Errorf("%v: unexpected %v and the end of function", fname, ident)
 		case "lambda":
-			return TypeFunc, nil
+			return types.TypeFunc, nil
 		case "and", "or":
-			return TypeBool, nil
+			return types.TypeBool, nil
 		case "gen", "gen'":
-			return TypeList, nil
+			return types.TypeList, nil
 		case "apply":
 			if len(a.List) != 3 {
 				return u, fmt.Errorf("%v: incorrect number of arguments to 'apply': %v", fname, a.List)
@@ -675,17 +673,17 @@ func (i *Interpret) exprType(fname string, e Param, vars map[string]Type) (resul
 			if err != nil {
 				return u, err
 			}
-			if ftype != TypeFunc {
+			if ftype != types.TypeFunc {
 				return u, fmt.Errorf("%v: apply expects function on first place, found: %v", fname, a.List[1])
 			}
 			atype, err := i.exprType(fname, a.List[2], vars)
 			if err != nil {
 				return u, err
 			}
-			if atype.Basic() != "list" && atype != TypeUnknown {
+			if atype.Basic() != "list" && atype != types.TypeUnknown {
 				return u, fmt.Errorf("%v: apply expects list on second place, found: %v (%v)", fname, a.List[2], atype)
 			}
-			fi, ok := i.funcs[string(a.List[1].V.(Ident))]
+			fi, ok := i.funcs[string(a.List[1].E.(types.Ident))]
 			if !ok {
 				return u, fmt.Errorf("%v: unknown function supplied to apply: %v", fname, a.List[1])
 			}
@@ -698,7 +696,7 @@ func (i *Interpret) exprType(fname string, e Param, vars map[string]Type) (resul
 			if err != nil {
 				return u, err
 			}
-			if condType != TypeBool && condType != TypeUnknown {
+			if condType != types.TypeBool && condType != types.TypeUnknown {
 				return u, fmt.Errorf("%v: condition in if-statement should return :bool, found: %v", fname, condType)
 			}
 			t1, err := i.exprType(fname, a.List[2], vars)
@@ -709,13 +707,13 @@ func (i *Interpret) exprType(fname string, e Param, vars map[string]Type) (resul
 			if err != nil {
 				return u, err
 			}
-			if t1 == TypeUnknown || t2 == TypeUnknown {
-				return TypeUnknown, nil
+			if t1 == types.TypeUnknown || t2 == types.TypeUnknown {
+				return types.TypeUnknown, nil
 			}
 			t1 = i.UnaliasType(t1)
 			t2 = i.UnaliasType(t2)
 			if t1 != t2 {
-				return TypeAny, nil
+				return types.TypeAny, nil
 			}
 			return t1, nil
 		case "do":
@@ -725,8 +723,8 @@ func (i *Interpret) exprType(fname string, e Param, vars map[string]Type) (resul
 		default:
 			// this is a function call
 			if tvar, ok := vars[name]; ok {
-				if tvar == TypeFunc || tvar == TypeUnknown {
-					return TypeUnknown, nil
+				if tvar == types.TypeFunc || tvar == types.TypeUnknown {
+					return types.TypeUnknown, nil
 				}
 				if tvar.Basic() == "func" {
 					args := tvar.Arguments()
@@ -735,27 +733,27 @@ func (i *Interpret) exprType(fname string, e Param, vars map[string]Type) (resul
 					}
 					rt := args[len(args)-1]
 					for idx, item := range a.List[1:] {
-						switch a := item.V.(type) {
-						case Int:
-							if ok, err := i.canConvertType(TypeInt, Type(args[idx])); !ok || err != nil {
-								return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, Type(args[idx]), TypeInt)
+						switch a := item.E.(type) {
+						case types.Int:
+							if ok, err := i.canConvertType(types.TypeInt, types.Type(args[idx])); !ok || err != nil {
+								return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, types.Type(args[idx]), types.TypeInt)
 							}
-						case Str:
-							if ok, err := i.canConvertType(TypeStr, Type(args[idx])); !ok || err != nil {
-								return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, Type(args[idx]), TypeStr)
+						case types.Str:
+							if ok, err := i.canConvertType(types.TypeStr, types.Type(args[idx])); !ok || err != nil {
+								return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, types.Type(args[idx]), types.TypeStr)
 							}
-						case Bool:
-							if ok, err := i.canConvertType(TypeBool, Type(args[idx])); !ok || err != nil {
-								return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, Type(args[idx]), TypeBool)
+						case types.Bool:
+							if ok, err := i.canConvertType(types.TypeBool, types.Type(args[idx])); !ok || err != nil {
+								return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, types.Type(args[idx]), types.TypeBool)
 							}
-						case *Sexpr:
+						case *types.Sexpr:
 							if a.Empty() || a.Quoted {
-								if ok, err := i.canConvertType(TypeList, Type(args[idx])); !ok || err != nil {
-									return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, Type(args[idx]), TypeList)
+								if ok, err := i.canConvertType(types.TypeList, types.Type(args[idx])); !ok || err != nil {
+									return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, types.Type(args[idx]), types.TypeList)
 								}
 							} else if a.Lambda {
-								if ok, err := i.canConvertType(TypeFunc, Type(args[idx])); !ok || err != nil {
-									return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, Type(args[idx]), TypeFunc)
+								if ok, err := i.canConvertType(types.TypeFunc, types.Type(args[idx])); !ok || err != nil {
+									return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, types.Type(args[idx]), types.TypeFunc)
 								}
 							} else {
 								itemType, err := i.exprType(fname, item, vars)
@@ -763,65 +761,65 @@ func (i *Interpret) exprType(fname string, e Param, vars map[string]Type) (resul
 									return u, err
 								}
 								if !i.IsGeneric(itemType) {
-									if ok, err := i.canConvertType(itemType, Type(args[idx])); !ok || err != nil {
-										return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, Type(args[idx]), itemType)
+									if ok, err := i.canConvertType(itemType, types.Type(args[idx])); !ok || err != nil {
+										return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, types.Type(args[idx]), itemType)
 									}
 								}
 							}
-						case Ident:
+						case types.Ident:
 							itemType, err := i.exprType(fname, item, vars)
 							if err != nil {
 								return u, err
 							}
 							if !i.IsGeneric(itemType) {
-								if ok, err := i.canConvertType(itemType, Type(args[idx])); !ok || err != nil {
-									return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, Type(args[idx]), itemType)
+								if ok, err := i.canConvertType(itemType, types.Type(args[idx])); !ok || err != nil {
+									return u, fmt.Errorf("%v: cannot use %v as argument %d to %v: expected %v, found %v", fname, item, idx, name, types.Type(args[idx]), itemType)
 								}
 							}
 						default:
 							panic(fmt.Errorf("%v: unexpected type: %v", fname, item))
 						}
 					}
-					return Type(rt), nil
+					return types.Type(rt), nil
 				}
 				return u, fmt.Errorf("%v: expected '%v' to be function, found: %v", fname, name, tvar)
 			}
 			f, ok := i.funcs[name]
 			if !ok {
 				fmt.Fprintf(os.Stderr, "%v: cannot detect return type of function %v\n", fname, name)
-				return TypeAny, nil
+				return types.TypeAny, nil
 			}
 
 			// check if we have matching func impl
-			params := []Param{}
+			params := []types.Value{}
 			for _, item := range a.List[1:] {
-				switch a := item.V.(type) {
-				case Int, Str, Bool:
+				switch a := item.E.(type) {
+				case types.Int, types.Str, types.Bool:
 					params = append(params, item)
-				case *Sexpr:
+				case *types.Sexpr:
 					if a.Empty() || a.Quoted {
-						params = append(params, Param{T: TypeList, V: a})
+						params = append(params, types.Value{T: types.TypeList, E: a})
 					} else if a.Lambda {
-						params = append(params, Param{T: TypeFunc})
+						params = append(params, types.Value{T: types.TypeFunc})
 					} else {
 						itemType, err := i.exprType(fname, item, vars)
 						if err != nil {
 							return u, err
 						}
 						if i.IsGeneric(itemType) {
-							itemType = TypeUnknown
+							itemType = types.TypeUnknown
 						}
-						params = append(params, Param{T: itemType})
+						params = append(params, types.Value{T: itemType})
 					}
-				case Ident:
+				case types.Ident:
 					itemType, err := i.exprType(fname, item, vars)
 					if err != nil {
 						return u, err
 					}
 					if i.IsGeneric(itemType) {
-						itemType = TypeUnknown
+						itemType = types.TypeUnknown
 					}
-					params = append(params, Param{T: itemType})
+					params = append(params, types.Value{T: itemType})
 				default:
 					panic(fmt.Errorf("%v: unexpected type: %v", fname, item))
 				}
@@ -835,20 +833,20 @@ func (i *Interpret) exprType(fname string, e Param, vars map[string]Type) (resul
 		}
 	}
 	fmt.Fprintf(os.Stderr, "Unexpected return. (TypeAny)\n")
-	return TypeAny, nil
+	return types.TypeAny, nil
 }
 
-func (in *Interpret) UnaliasType(t Type) Type {
+func (in *Interpret) UnaliasType(t types.Type) types.Type {
 	if tt, ok := in.typeAliases[t]; ok {
 		return tt
 	}
 	return t
 }
 
-func (in *Interpret) parseType(token string) (Type, error) {
-	t, ok := ParseType(token)
+func (in *Interpret) parseType(token string) (types.Type, error) {
+	t, ok := types.ParseType(token)
 	if !ok {
-		return TypeUnknown, fmt.Errorf("Token is not a type: %q", token)
+		return types.TypeUnknown, fmt.Errorf("Token is not a type: %q", token)
 	}
 	t = in.UnaliasType(t)
 	_, ok = in.types[t.Canonical()]
@@ -858,7 +856,7 @@ func (in *Interpret) parseType(token string) (Type, error) {
 	return t, nil
 }
 
-func (in *Interpret) toParent(from, parent Type) (Type, error) {
+func (in *Interpret) toParent(from, parent types.Type) (types.Type, error) {
 	binds := map[string]string{}
 	for i, p := range from.Arguments() {
 		if len(p) == 1 {
@@ -870,7 +868,7 @@ func (in *Interpret) toParent(from, parent Type) (Type, error) {
 	f := from.Canonical()
 	for {
 		if f == "" {
-			return TypeUnknown, fmt.Errorf("Cannot convert %v into %v", from, parent)
+			return types.TypeUnknown, fmt.Errorf("Cannot convert %v into %v", from, parent)
 		}
 		if f.Basic() == parent.Basic() {
 			parent = f
@@ -883,7 +881,7 @@ func (in *Interpret) toParent(from, parent Type) (Type, error) {
 		}
 		par, ok := in.types[f.Canonical()]
 		if !ok {
-			return TypeUnknown, fmt.Errorf("Cannot convert type %v into %v: %v is not defined", from, parent, f)
+			return types.TypeUnknown, fmt.Errorf("Cannot convert type %v into %v: %v is not defined", from, parent, f)
 		}
 		f = par
 	}
@@ -904,20 +902,20 @@ func (in *Interpret) toParent(from, parent Type) (Type, error) {
 		res += "]"
 	}
 
-	return Type(res), nil
+	return types.Type(res), nil
 }
 
-func (in *Interpret) IsContract(t Type) bool {
+func (in *Interpret) IsContract(t types.Type) bool {
 	_, ok := in.contracts[t]
 	return ok
 }
 
-func (in *Interpret) IsGeneric(t Type) bool {
+func (in *Interpret) IsGeneric(t types.Type) bool {
 	if in.IsContract(t) {
 		return true
 	}
 	for _, a := range t.Arguments() {
-		if in.IsGeneric(Type(a)) {
+		if in.IsGeneric(types.Type(a)) {
 			return true
 		}
 	}

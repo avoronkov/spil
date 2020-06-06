@@ -4,182 +4,184 @@ import (
 	"fmt"
 	"os"
 	"testing"
+
+	"github.com/avoronkov/spil/types"
 )
 
 func TestMatchParameters(t *testing.T) {
 	tests := []struct {
 		name   string
 		argfmt *ArgFmt
-		args   []Param
+		args   []types.Value
 		exp    bool
 	}{
 		{
 			"no args",
 			MakeArgFmt(),
-			MakeParametersFromArgs([]Expr{}),
+			MakeParametersFromArgs([]types.Expr{}),
 			true,
 		},
 		{
 			"empty list",
-			MakeArgFmt(Arg{T: TypeList, V: QEmpty}),
-			MakeParametersFromArgs([]Expr{QEmpty}),
+			MakeArgFmt(Arg{T: types.TypeList, V: types.QEmpty}),
+			MakeParametersFromArgs([]types.Expr{types.QEmpty}),
 			true,
 		},
 		{
 			"empty list (2)",
-			MakeArgFmt(Arg{T: TypeList, V: QEmpty}),
-			MakeParametersFromArgs([]Expr{QList(Int64Param(1))}),
+			MakeArgFmt(Arg{T: types.TypeList, V: types.QEmpty}),
+			MakeParametersFromArgs([]types.Expr{types.QList(Int64Param(1))}),
 			false,
 		},
 		{
 			"any + epty list",
-			MakeArgFmt(Arg{Name: "x", T: TypeAny}, Arg{T: TypeList, V: QEmpty}),
-			MakeParametersFromArgs([]Expr{QList(Int64Param(1)), QEmpty}),
+			MakeArgFmt(Arg{Name: "x", T: types.TypeAny}, Arg{T: types.TypeList, V: types.QEmpty}),
+			MakeParametersFromArgs([]types.Expr{types.QList(Int64Param(1)), types.QEmpty}),
 			true,
 		},
 		{
 			"str + epty list",
-			MakeArgFmt(Arg{Name: "x", T: TypeStr}, Arg{T: TypeList, V: QEmpty}),
-			MakeParametersFromArgs([]Expr{QList(Int64Param(1)), QEmpty}),
+			MakeArgFmt(Arg{Name: "x", T: types.TypeStr}, Arg{T: types.TypeList, V: types.QEmpty}),
+			MakeParametersFromArgs([]types.Expr{types.QList(Int64Param(1)), types.QEmpty}),
 			false,
 		},
 		{
 			"wildcard",
 			MakeWildcard("args"),
-			MakeParametersFromArgs([]Expr{QList(Int64Param(1)), QEmpty}),
+			MakeParametersFromArgs([]types.Expr{types.QList(Int64Param(1)), types.QEmpty}),
 			true,
 		},
 		{
 			"any + empty list (2)",
-			MakeArgFmt(Arg{Name: "x", T: TypeAny}, Arg{T: TypeList, V: QEmpty}),
-			MakeParametersFromArgs([]Expr{QList(Int64Param(1)), QEmpty}),
+			MakeArgFmt(Arg{Name: "x", T: types.TypeAny}, Arg{T: types.TypeList, V: types.QEmpty}),
+			MakeParametersFromArgs([]types.Expr{types.QList(Int64Param(1)), types.QEmpty}),
 			true,
 		},
 		{
 			"bool + empty list",
-			MakeArgFmt(Arg{Name: "x", T: TypeBool}, Arg{T: TypeList, V: QEmpty}),
-			MakeParametersFromArgs([]Expr{QList(Int64Param(1)), QEmpty}),
+			MakeArgFmt(Arg{Name: "x", T: types.TypeBool}, Arg{T: types.TypeList, V: types.QEmpty}),
+			MakeParametersFromArgs([]types.Expr{types.QList(Int64Param(1)), types.QEmpty}),
 			false,
 		},
 		{
 			"any x + x",
-			MakeArgFmt(Arg{Name: "x", T: TypeAny}, Arg{Name: "x", T: TypeAny}),
-			MakeParametersFromArgs([]Expr{Int64(1), Int64(1)}),
+			MakeArgFmt(Arg{Name: "x", T: types.TypeAny}, Arg{Name: "x", T: types.TypeAny}),
+			MakeParametersFromArgs([]types.Expr{types.Int64(1), types.Int64(1)}),
 			true,
 		},
 		{
 			"any x + x (2)",
-			MakeArgFmt(Arg{Name: "x", T: TypeAny}, Arg{Name: "x", T: TypeAny}),
-			MakeParametersFromArgs([]Expr{Int64(1), Int64(2)}),
+			MakeArgFmt(Arg{Name: "x", T: types.TypeAny}, Arg{Name: "x", T: types.TypeAny}),
+			MakeParametersFromArgs([]types.Expr{types.Int64(1), types.Int64(2)}),
 			false,
 		},
 		{
 			"str x + x",
-			MakeArgFmt(Arg{Name: "x", T: TypeStr}, Arg{Name: "x", T: TypeStr}),
-			MakeParametersFromArgs([]Expr{Int64(1), Int64(1)}),
+			MakeArgFmt(Arg{Name: "x", T: types.TypeStr}, Arg{Name: "x", T: types.TypeStr}),
+			MakeParametersFromArgs([]types.Expr{types.Int64(1), types.Int64(1)}),
 			false,
 		},
 		{
 			"str x + 1",
-			MakeArgFmt(Arg{Name: "x", T: TypeStr}, Arg{T: TypeInt, V: Int64(1)}),
-			MakeParametersFromArgs([]Expr{Int64(1), Int64(1)}),
+			MakeArgFmt(Arg{Name: "x", T: types.TypeStr}, Arg{T: types.TypeInt, V: types.Int64(1)}),
+			MakeParametersFromArgs([]types.Expr{types.Int64(1), types.Int64(1)}),
 			false,
 		},
 		{
 			"str x + 1 (2)",
-			MakeArgFmt(Arg{Name: "x", T: TypeStr}, Arg{T: TypeInt, V: Int64(1)}),
-			MakeParametersFromArgs([]Expr{Int64(1), Int64(2)}),
+			MakeArgFmt(Arg{Name: "x", T: types.TypeStr}, Arg{T: types.TypeInt, V: types.Int64(1)}),
+			MakeParametersFromArgs([]types.Expr{types.Int64(1), types.Int64(2)}),
 			false,
 		},
 		{
 			"int 1",
-			MakeArgFmt(Arg{T: TypeInt, V: Int64(1)}),
-			MakeParametersFromArgs([]Expr{Str("Hello")}),
+			MakeArgFmt(Arg{T: types.TypeInt, V: types.Int64(1)}),
+			MakeParametersFromArgs([]types.Expr{types.Str("Hello")}),
 			false,
 		},
 		{
 			"ampty list vs empty lazy list",
-			MakeArgFmt(Arg{T: TypeList, V: QEmpty}),
-			MakeParametersFromArgs([]Expr{makeEmptyGen()}),
+			MakeArgFmt(Arg{T: types.TypeList, V: types.QEmpty}),
+			MakeParametersFromArgs([]types.Expr{makeEmptyGen()}),
 			true,
 		},
 		{
 			"int 13 vs unknown 13",
-			MakeArgFmt(Arg{T: TypeInt, V: Int64(13)}),
-			[]Param{Param{T: TypeUnknown, V: Int64(13)}},
+			MakeArgFmt(Arg{T: types.TypeInt, V: types.Int64(13)}),
+			[]types.Value{{T: types.TypeUnknown, E: types.Int64(13)}},
 			true,
 		},
 		{
 			"int 15 vs unknown 439",
-			MakeArgFmt(Arg{Name: "n", T: TypeInt, V: Int64(15)}),
-			[]Param{Param{T: TypeUnknown, V: Int64(439)}},
+			MakeArgFmt(Arg{Name: "n", T: types.TypeInt, V: types.Int64(15)}),
+			[]types.Value{{T: types.TypeUnknown, E: types.Int64(439)}},
 			false,
 		},
 		/*
 			{
-				MakeArgFmt(Arg{Name: "n", T: TypeInt, V: Int64(1)}),
-				[]Param{Param{T: TypeAny, V: Int64(1)}},
+				MakeArgFmt(Arg{Name: "n", T: types.TypeInt, V: types.Int64(1)}),
+				[]Param{Param{T: types.TypeAny, V: types.Int64(1)}},
 				true,
 			},
 		*/
 		{
 			"list vs set",
-			MakeArgFmt(Arg{Name: "n", T: TypeList}),
-			[]Param{Param{T: Type("set"), V: QEmpty}},
+			MakeArgFmt(Arg{Name: "n", T: types.TypeList}),
+			[]types.Value{{T: types.Type("set"), E: types.QEmpty}},
 			true,
 		},
 		{
 			"list vs any",
-			MakeArgFmt(Arg{Name: "n", T: TypeList}),
-			[]Param{Param{T: TypeAny}},
+			MakeArgFmt(Arg{Name: "n", T: types.TypeList}),
+			[]types.Value{{T: types.TypeAny}},
 			false,
 		},
 		{
 			"any vs list",
-			MakeArgFmt(Arg{Name: "n", T: TypeAny}),
-			[]Param{Param{T: TypeList}},
+			MakeArgFmt(Arg{Name: "n", T: types.TypeAny}),
+			[]types.Value{{T: types.TypeList}},
 			true,
 		},
 		{
 			":a :a vs :int :int",
 			MakeArgFmt(Arg{Name: "a", T: "a"}, Arg{Name: "b", T: "a"}),
-			[]Param{{T: TypeInt}, {T: TypeInt}},
+			[]types.Value{{T: types.TypeInt}, {T: types.TypeInt}},
 			true,
 		},
 		{
 			":a :a vs :int :str",
 			MakeArgFmt(Arg{Name: "a", T: "a"}, Arg{Name: "b", T: "a"}),
-			[]Param{Param{T: TypeInt}, Param{T: TypeStr}},
+			[]types.Value{{T: types.TypeInt}, {T: types.TypeStr}},
 			false,
 		},
 		{
 			":a :list[a] vs :int :list[int]",
 			MakeArgFmt(Arg{Name: "elem", T: "a"}, Arg{Name: "lst", T: "list[a]"}),
-			[]Param{Param{T: TypeInt}, Param{T: "list[int]"}},
+			[]types.Value{{T: types.TypeInt}, {T: "list[int]"}},
 			true,
 		},
 		{
 			":a :list[a] vs :int :list[any]",
 			MakeArgFmt(Arg{Name: "elem", T: "a"}, Arg{Name: "lst", T: "list[a]"}),
-			[]Param{Param{T: TypeInt}, Param{T: "list[any]"}},
+			[]types.Value{{T: types.TypeInt}, {T: "list[any]"}},
 			false,
 		},
 		{
 			":list vs :list[any]",
 			MakeArgFmt(Arg{Name: "lst", T: "list[any]"}),
-			[]Param{Param{T: "list"}},
+			[]types.Value{{T: "list"}},
 			true,
 		},
 		{
 			":list[any] vs :list",
 			MakeArgFmt(Arg{Name: "lst", T: "list"}),
-			[]Param{Param{T: "list[any]"}},
+			[]types.Value{{T: "list[any]"}},
 			true,
 		},
 	}
 	in := NewInterpreter(os.Stderr, getTestLibraryDir())
 	fi := NewFuncInterpret(in, "__test__")
-	in.types[Type("set")] = "list[any]"
+	in.types[types.Type("set")] = "list[any]"
 
 	// contracts
 	in.types["a"] = ""
@@ -195,16 +197,20 @@ func TestMatchParameters(t *testing.T) {
 	}
 }
 
-func makeEmptyGen() List {
-	gen := func(args []Param) (*Param, error) {
-		return &Param{V: QEmpty, T: TypeList}, nil
+func makeEmptyGen() types.List {
+	gen := func(args []types.Value) (*types.Value, error) {
+		return &types.Value{E: types.QEmpty, T: types.TypeList}, nil
 	}
-	return NewLazyList(EvalerFunc("__gen__", gen, AnyArgs, TypeAny), []Param{{V: QEmpty, T: TypeList}}, false)
+	return NewLazyList(
+		EvalerFunc("__gen__", gen, AnyArgs, types.TypeAny),
+		[]types.Value{{E: types.QEmpty, T: types.TypeList}},
+		false,
+	)
 }
 
 func TestCanConvertType(t *testing.T) {
 	tests := []struct {
-		from, to Type
+		from, to types.Type
 		res      bool
 	}{
 		{"int", "any", true},
@@ -224,40 +230,45 @@ func TestCanConvertType(t *testing.T) {
 	}
 }
 
+func emptyStringTypeMap() *map[string]types.Type {
+	m := make(map[string]types.Type)
+	return &m
+}
+
 func TestMatchType(t *testing.T) {
 	tests := []struct {
 		name   string
-		arg    Type
-		val    Type
-		binds  *map[string]Type
+		arg    types.Type
+		val    types.Type
+		binds  *map[string]types.Type
 		result bool
 	}{
-		{"int-int", "int", "int", &map[string]Type{}, true},
-		{"any-int", "any", "int", &map[string]Type{}, true},
-		{"a-int", "a", "int", &map[string]Type{}, true},
-		{"a-int-str", "a", "str", &map[string]Type{"a": "int"}, false},
-		{"list[a]-list[int]", "list[a]", "list[int]", &map[string]Type{}, true},
-		{"list[int]-tset[int]", "list[int]", "tset[int]", &map[string]Type{}, true},
-		{"list[a]-tset[int]", "list[a]", "tset[int]", &map[string]Type{}, true},
-		{"list[any]-set", "list[any]", "set", &map[string]Type{}, true},
-		{"some[a,a]-some[x,y]", "some[a,a]", "some[x,y]", &map[string]Type{}, false},
-		{"some[a,b]-some[x,y]", "some[a,b]", "some[x,y]", &map[string]Type{}, true},
-		{"some[int,b]-some[int,y]", "some[int,b]", "some[int,y]", &map[string]Type{}, true},
-		{"some[int,b]-some[x,y]", "some[a,b]", "some[int,y]", &map[string]Type{}, true},
-		{"some[a,b]-intsome[a]", "some[a,b]", "intsome[a]", &map[string]Type{}, true},
-		{"some[a,list[a]]-some[int,list[int]]", "some[a,list[a]]", "some[int,list[int]]", &map[string]Type{}, true},
-		{"some[a,list[a]]-some[int,list[str]]", "some[a,list[a]]", "some[int,list[str]]", &map[string]Type{}, false},
-		{"list-list[any]", "list", "list[any]", &map[string]Type{}, true},
-		{"list[any]-list", "list[any]", "list", &map[string]Type{}, true},
-		{"list-any", "any", "list", &map[string]Type{}, true},
-		{"list[a]-list", "list[a]", "list", &map[string]Type{}, true},
-		{"list[a]-list[any]", "list[a]", "list[any]", &map[string]Type{}, true},
-		{"func[a]-func", "func[a]", "func", &map[string]Type{}, true},
-		{"func-func[a]", "func", "func[a]", &map[string]Type{}, true},
+		{"int-int", "int", "int", emptyStringTypeMap(), true},
+		{"any-int", "any", "int", emptyStringTypeMap(), true},
+		{"a-int", "a", "int", emptyStringTypeMap(), true},
+		{"a-int-str", "a", "str", &map[string]types.Type{"a": "int"}, false},
+		{"list[a]-list[int]", "list[a]", "list[int]", emptyStringTypeMap(), true},
+		{"list[int]-tset[int]", "list[int]", "tset[int]", emptyStringTypeMap(), true},
+		{"list[a]-tset[int]", "list[a]", "tset[int]", emptyStringTypeMap(), true},
+		{"list[any]-set", "list[any]", "set", emptyStringTypeMap(), true},
+		{"some[a,a]-some[x,y]", "some[a,a]", "some[x,y]", emptyStringTypeMap(), false},
+		{"some[a,b]-some[x,y]", "some[a,b]", "some[x,y]", emptyStringTypeMap(), true},
+		{"some[int,b]-some[int,y]", "some[int,b]", "some[int,y]", emptyStringTypeMap(), true},
+		{"some[int,b]-some[x,y]", "some[a,b]", "some[int,y]", emptyStringTypeMap(), true},
+		{"some[a,b]-intsome[a]", "some[a,b]", "intsome[a]", emptyStringTypeMap(), true},
+		{"some[a,list[a]]-some[int,list[int]]", "some[a,list[a]]", "some[int,list[int]]", emptyStringTypeMap(), true},
+		{"some[a,list[a]]-some[int,list[str]]", "some[a,list[a]]", "some[int,list[str]]", emptyStringTypeMap(), false},
+		{"list-list[any]", "list", "list[any]", emptyStringTypeMap(), true},
+		{"list[any]-list", "list[any]", "list", emptyStringTypeMap(), true},
+		{"list-any", "any", "list", emptyStringTypeMap(), true},
+		{"list[a]-list", "list[a]", "list", emptyStringTypeMap(), true},
+		{"list[a]-list[any]", "list[a]", "list[any]", emptyStringTypeMap(), true},
+		{"func[a]-func", "func[a]", "func", emptyStringTypeMap(), true},
+		{"func-func[a]", "func", "func[a]", emptyStringTypeMap(), true},
 	}
 
 	in := NewInterpreter(os.Stderr, getTestLibraryDir())
-	in.types["some[a,b]"] = TypeAny
+	in.types["some[a,b]"] = types.TypeAny
 	in.types["set"] = "list[any]"
 	in.types["tset[a]"] = "list[a]"
 	in.types["intsome[a]"] = "some[int,a]"
@@ -286,8 +297,8 @@ func TestMatchType(t *testing.T) {
 func TestToParent(t *testing.T) {
 	tests := []struct {
 		name         string
-		from, parent Type
-		exp          Type
+		from, parent types.Type
+		exp          types.Type
 	}{
 		{"set->list", "set", "list", "list[any]"},
 		{"tset[bool]->list", "tset[bool]", "list", "list[bool]"},
@@ -296,7 +307,7 @@ func TestToParent(t *testing.T) {
 	}
 
 	in := NewInterpreter(os.Stderr, getTestLibraryDir())
-	in.types["some[a,b]"] = TypeAny
+	in.types["some[a,b]"] = types.TypeAny
 	in.types["set"] = "list[any]"
 	in.types["tset[a]"] = "list[a]"
 	in.types["intsome[a]"] = "some[int,a]"

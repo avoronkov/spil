@@ -4,17 +4,19 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+
+	"github.com/avoronkov/spil/types"
 )
 
 type LazyInput struct {
 	file       io.ReadCloser
 	input      *bufio.Reader
 	valueReady bool
-	value      *Param
+	value      *types.Value
 	tail       *LazyInput
 }
 
-var _ List = (*LazyInput)(nil)
+var _ types.List = (*LazyInput)(nil)
 
 func NewLazyInput(f io.ReadCloser) *LazyInput {
 	return &LazyInput{
@@ -23,7 +25,7 @@ func NewLazyInput(f io.ReadCloser) *LazyInput {
 	}
 }
 
-func (i *LazyInput) Head() (*Param, error) {
+func (i *LazyInput) Head() (*types.Value, error) {
 	if err := i.next(); err != nil {
 		return nil, err
 	}
@@ -33,7 +35,7 @@ func (i *LazyInput) Head() (*Param, error) {
 	return i.value, nil
 }
 
-func (i *LazyInput) Tail() (List, error) {
+func (i *LazyInput) Tail() (types.List, error) {
 	if err := i.next(); err != nil {
 		return nil, err
 	}
@@ -67,7 +69,7 @@ func (i *LazyInput) next() error {
 	if err != nil {
 		return err
 	}
-	i.value = &Param{V: Str(string([]byte{b})), T: TypeStr}
+	i.value = &types.Value{E: types.Str(string([]byte{b})), T: types.TypeStr}
 	return nil
 }
 
@@ -83,7 +85,7 @@ func (i *LazyInput) Print(w io.Writer) {
 		return
 	}
 	h, _ := i.Head()
-	io.WriteString(w, string(h.V.(Str)))
+	io.WriteString(w, string(h.E.(types.Str)))
 	t, _ := i.Tail()
 	t.Print(w)
 }
@@ -99,6 +101,6 @@ func (i *LazyInput) Close() error {
 	return nil
 }
 
-func (i *LazyInput) Type() Type {
-	return TypeStr
+func (i *LazyInput) Type() types.Type {
+	return types.TypeStr
 }

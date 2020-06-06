@@ -3,14 +3,16 @@ package main
 import (
 	"fmt"
 	"io"
+
+	"github.com/avoronkov/spil/types"
 )
 
-var _ List = (*LazyList)(nil)
+var _ types.List = (*LazyList)(nil)
 
 type LazyList struct {
-	iter       Evaler
-	state      []Param
-	value      *Param
+	iter       types.Function
+	state      []types.Value
+	value      *types.Value
 	valueReady bool
 	tail       *LazyList
 	id         int64
@@ -18,7 +20,7 @@ type LazyList struct {
 
 var lazyHashCount int64
 
-func NewLazyList(iter Evaler, state []Param, hashable bool) *LazyList {
+func NewLazyList(iter types.Function, state []types.Value, hashable bool) *LazyList {
 	l := &LazyList{
 		iter:       iter,
 		state:      state,
@@ -50,7 +52,7 @@ func (l *LazyList) Hash() (string, error) {
 }
 
 func (l *LazyList) Print(w io.Writer) {
-	var ll List = l
+	var ll types.List = l
 	io.WriteString(w, "'(")
 	first := true
 	for !ll.Empty() {
@@ -64,7 +66,7 @@ func (l *LazyList) Print(w io.Writer) {
 		if err != nil {
 			panic(fmt.Errorf("Head() failed: %v", err))
 		}
-		val.V.Print(w)
+		val.E.Print(w)
 		ll, err = ll.Tail()
 		if err != nil {
 			panic(fmt.Errorf("Tail() failed: %v", err))
@@ -73,7 +75,7 @@ func (l *LazyList) Print(w io.Writer) {
 	io.WriteString(w, ")")
 }
 
-func (l *LazyList) Head() (*Param, error) {
+func (l *LazyList) Head() (*types.Value, error) {
 	// iter: state -> '(value, new-state)
 	// iter: value -> '(new-value)
 	// iter: value -> new-value
@@ -95,11 +97,11 @@ func (l *LazyList) next() (err error) {
 	if err != nil {
 		return fmt.Errorf("LazyList: Eval(%v) failed: %v", l.state, err)
 	}
-	res, ok := expr.V.(*Sexpr)
+	res, ok := expr.E.(*types.Sexpr)
 	if !ok {
 		l.valueReady = true
 		l.value = expr
-		l.state = []Param{*expr}
+		l.state = []types.Value{*expr}
 		return nil
 	}
 	if len(res.List) == 0 {
@@ -113,7 +115,7 @@ func (l *LazyList) next() (err error) {
 		// state = value
 		l.valueReady = true
 		l.value = &res.List[0]
-		l.state = []Param{res.List[0]}
+		l.state = []types.Value{res.List[0]}
 		return nil
 	}
 	p1 := res.List[0]
@@ -121,7 +123,7 @@ func (l *LazyList) next() (err error) {
 	if err != nil {
 		return err
 	}
-	var newState []Param
+	var newState []types.Value
 	for !tail.Empty() {
 		p, err := tail.Head()
 		if err != nil {
@@ -139,7 +141,7 @@ func (l *LazyList) next() (err error) {
 	return nil
 }
 
-func (l *LazyList) Tail() (List, error) {
+func (l *LazyList) Tail() (types.List, error) {
 	if !l.valueReady {
 		err := l.next()
 		if err != nil {
@@ -165,6 +167,6 @@ func (l *LazyList) Empty() (result bool) {
 	return l.value == nil
 }
 
-func (l *LazyList) Type() Type {
-	return TypeList
+func (l *LazyList) Type() types.Type {
+	return types.TypeList
 }

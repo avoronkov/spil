@@ -6,6 +6,8 @@ import (
 	"io"
 	"strings"
 	"unicode"
+
+	"github.com/avoronkov/spil/types"
 )
 
 var (
@@ -13,12 +15,12 @@ var (
 )
 
 type IntParser interface {
-	ParseInt(token string) (Int, bool)
+	ParseInt(token string) (types.Int, bool)
 }
 
-type IntParserFn func(token string) (Int, bool)
+type IntParserFn func(token string) (types.Int, bool)
 
-func (f IntParserFn) ParseInt(token string) (Int, bool) {
+func (f IntParserFn) ParseInt(token string) (types.Int, bool) {
 	return f(token)
 }
 
@@ -38,7 +40,7 @@ func NewParser(r io.Reader, intParser IntParser) *Parser {
 	}
 }
 
-func (p *Parser) NextExpr() (*Param, error) {
+func (p *Parser) NextExpr() (*types.Value, error) {
 	token, err := p.nextToken()
 	if err != nil {
 		return nil, err
@@ -52,20 +54,20 @@ func (p *Parser) NextExpr() (*Param, error) {
 	}
 	if token == "'T" || token == "'F" || token == "true" || token == "false" {
 		v := token == "'T" || token == "true"
-		return &Param{V: Bool(v), T: TypeBool}, nil
+		return &types.Value{E: types.Bool(v), T: types.TypeBool}, nil
 	}
 	if n, ok := p.intParser.ParseInt(token); ok {
-		return &Param{V: n, T: TypeInt}, nil
+		return &types.Value{E: n, T: types.TypeInt}, nil
 	}
-	if s, err := ParseString(token); err == nil {
-		return &Param{V: s, T: TypeStr}, nil
+	if s, err := types.ParseString(token); err == nil {
+		return &types.Value{E: s, T: types.TypeStr}, nil
 	}
 	// TODO
-	return &Param{V: Ident(token), T: TypeUnknown}, nil
+	return &types.Value{E: types.Ident(token), T: types.TypeUnknown}, nil
 }
 
-func (p *Parser) nextSexpr(leftBrace string, quoted bool) (*Param, error) {
-	var list []Param
+func (p *Parser) nextSexpr(leftBrace string, quoted bool) (*types.Value, error) {
+	var list []types.Value
 	for {
 		token, err := p.nextToken()
 		if err == io.EOF {
@@ -89,26 +91,26 @@ func (p *Parser) nextSexpr(leftBrace string, quoted bool) (*Param, error) {
 		list = append(list, *par)
 	}
 
-	return &Param{V: &Sexpr{
+	return &types.Value{E: &types.Sexpr{
 		List:   list,
 		Quoted: quoted || leftBrace == "'(",
 		Lambda: leftBrace == "\\(",
-	}, T: TypeList}, nil
+	}, T: types.TypeList}, nil
 }
 
-func (p *Parser) tokenParam(token string) *Param {
+func (p *Parser) tokenParam(token string) *types.Value {
 	if token == "'T" || token == "'F" || token == "true" || token == "false" {
 		v := token == "'T" || token == "true"
-		return &Param{V: Bool(v), T: TypeBool}
+		return &types.Value{E: types.Bool(v), T: types.TypeBool}
 	}
 	if n, ok := p.intParser.ParseInt(token); ok {
-		return &Param{V: n, T: TypeInt}
+		return &types.Value{E: n, T: types.TypeInt}
 	}
-	if s, err := ParseString(token); err == nil {
-		return &Param{V: s, T: TypeStr}
+	if s, err := types.ParseString(token); err == nil {
+		return &types.Value{E: s, T: types.TypeStr}
 	}
 	// TODO
-	return &Param{V: Ident(token), T: TypeUnknown}
+	return &types.Value{E: types.Ident(token), T: types.TypeUnknown}
 }
 
 func (p *Parser) nextToken() (string, error) {

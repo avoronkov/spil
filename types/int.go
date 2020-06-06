@@ -1,4 +1,4 @@
-package main
+package types
 
 import (
 	"fmt"
@@ -24,6 +24,9 @@ type IntMaker interface {
 	MakeInt(i int64) Int
 }
 
+//
+// Int 64
+//
 type Int64 int64
 
 var _ Int = Int64(0)
@@ -91,6 +94,9 @@ func (i Int64) Int64() int64 {
 	return int64(i)
 }
 
+//
+// Big int
+//
 type BigInt struct {
 	value *big.Int
 }
