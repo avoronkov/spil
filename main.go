@@ -40,6 +40,7 @@ func doMain() int {
 	in := NewInterpreter(os.Stdout, getReleaseLibraryDir())
 	in.UseBigInt(bigint)
 	in.PluginDir = getReleasePluginDir()
+	in.IncludeDirs = []string{in.PluginDir}
 
 	var file string
 	var input io.Reader

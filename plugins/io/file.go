@@ -35,6 +35,5 @@ func (f *IoFile) Type() types.Type {
 }
 
 func (f *IoFile) Close() error {
-	fmt.Fprintf(os.Stderr, "Closing file %v...\n", f.name)
 	return f.file.Close()
 }

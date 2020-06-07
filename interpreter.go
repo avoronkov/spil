@@ -24,8 +24,9 @@ type Interpret struct {
 	// string->filepath map to control where function was initially defined.
 	funcsOrigins map[string]string
 
-	libraryDir string
-	PluginDir  string
+	libraryDir  string
+	PluginDir   string
+	IncludeDirs []string
 
 	intMaker types.IntMaker
 
@@ -275,17 +276,7 @@ func (i *Interpret) use(args []types.Value) error {
 	module := args[0]
 	switch a := module.E.(type) {
 	case types.Str:
-		f, err := os.Open(string(a))
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		fpath, err := filepath.Abs(string(a))
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Cannot detect absolute path for %v: %v\n", string(a), err)
-			fpath = string(a)
-		}
-		return i.parse(fpath, f)
+		return i.useModule(string(a))
 	case types.Ident:
 		switch string(a) {
 		case "bigmath":
@@ -303,6 +294,25 @@ func (i *Interpret) use(args []types.Value) error {
 		return nil
 	}
 	return fmt.Errorf("Unexpected argument type to 'use': %v (%T)", module, module)
+}
+
+func (in *Interpret) useModule(name string) error {
+	includeDirs := append([]string{"."}, in.IncludeDirs...)
+	for _, d := range includeDirs {
+		filename := filepath.Join(d, name)
+		f, err := os.Open(filename)
+		if os.IsNotExist(err) {
+			continue
+		}
+		defer f.Close()
+		fpath, err := filepath.Abs(filename)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Cannot detect absolute path for %v: %v\n", filename, err)
+			fpath = filename
+		}
+		return in.parse(fpath, f)
+	}
+	return fmt.Errorf("Module %v not found in %v", includeDirs)
 }
 
 func (in *Interpret) usePlugin(name string) error {
@@ -654,6 +664,14 @@ L:
 	return rt.Expand(tps), nil
 }
 
+type ReturnTyper interface {
+	ReturnType() types.Type
+}
+
+type Binder interface {
+	TryBindAll([]types.Value) (types.Type, error)
+}
+
 var reArg = regexp.MustCompile(`^_[0-9]+$`)
 
 func (i *Interpret) exprType(fname string, e types.Value, vars map[string]types.Type) (result types.Type, err error) {
@@ -722,7 +740,10 @@ func (i *Interpret) exprType(fname string, e types.Value, vars map[string]types.
 			if !ok {
 				return u, fmt.Errorf("%v: unknown function supplied to apply: %v", fname, a.List[1])
 			}
-			return fi.ReturnType(), nil
+			if returnTyper, ok := fi.(ReturnTyper); ok {
+				return returnTyper.ReturnType(), nil
+			}
+			return u, nil
 		case "if":
 			if len(a.List) != 4 {
 				return u, fmt.Errorf("%v: incorrect number of arguments to 'if': %v", fname, a.List)
@@ -859,12 +880,16 @@ func (i *Interpret) exprType(fname string, e types.Value, vars map[string]types.
 					panic(fmt.Errorf("%v: unexpected type: %v", fname, item))
 				}
 			}
-			t, err := f.TryBindAll(params)
-			if err != nil {
-				return u, fmt.Errorf("%v: %v", fname, err)
+			if binder, ok := f.(Binder); ok {
+				t, err := binder.TryBindAll(params)
+				if err != nil {
+					return u, fmt.Errorf("%v: %v", fname, err)
+				}
+
+				return t, nil
 			}
 
-			return t, nil
+			return types.TypeUnknown, nil
 		}
 	}
 	fmt.Fprintf(os.Stderr, "Unexpected return. (TypeAny)\n")
