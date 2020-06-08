@@ -312,7 +312,7 @@ func (in *Interpret) useModule(name string) error {
 		}
 		return in.parse(fpath, f)
 	}
-	return fmt.Errorf("Module %v not found in %v", includeDirs)
+	return fmt.Errorf("Module %v not found in %v", name, includeDirs)
 }
 
 func (in *Interpret) usePlugin(name string) error {
