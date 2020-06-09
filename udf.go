@@ -259,14 +259,31 @@ func (f *FuncRuntime) bind(params []types.Value) (impl *FuncImpl, result *types.
 				T: types.TypeList,
 			}
 		} else {
-			if l := len(impl.argfmt.Args); l != len(params) {
-				err = fmt.Errorf("Incorrect number of arguments to %v: expected %v, found %v", f.fi.name, l, len(params))
-				return
-			}
+			varArgs := false
 			for i, arg := range impl.argfmt.Args {
+				if arg.T.Basic() == "args" {
+					// var args
+					varArgs = true
+					if len(params) > i && params[i].T.Basic() == "args" {
+						f.vars[arg.Name] = params[i]
+					} else {
+						f.vars[arg.Name] = types.Value{
+							E: &types.Sexpr{
+								Quoted: true,
+								List:   params[i:],
+							},
+							T: arg.T.Expand(tps),
+						}
+					}
+					break
+				}
 				if arg.V == nil {
 					f.vars[arg.Name] = params[i]
 				}
+			}
+			if !varArgs && len(impl.argfmt.Args) != len(params) {
+				err = fmt.Errorf("Incorrect number of arguments to %v: expected %v, found %v", f.fi.name, len(impl.argfmt.Args), len(params))
+				return
 			}
 		}
 	}
@@ -829,10 +846,44 @@ func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []types.Value) (r
 
 	binds := map[string]types.Expr{}
 	typeBinds := map[string]types.Type{}
-	if len(argfmt.Args) != len(params) {
-		return false, nil
-	}
 	for i, arg := range argfmt.Args {
+		// check for varargs
+		if arg.T.Basic() == "args" {
+			if i != len(argfmt.Args)-1 {
+				fmt.Fprintf(os.Stderr, "%v: parameter of type %v shoud go last\n", f.name, arg.T)
+				return false, nil
+			}
+			// the rest of params should match the type
+			targs := arg.T.Arguments()
+			if len(targs) != 1 {
+				fmt.Fprintf(os.Stderr, "%v: type %v should have exactly one parameter\n", f.name, arg.T)
+				return false, nil
+			}
+			if len(params) > i {
+				if params[i].T == arg.T {
+					if len(params) != i+1 {
+						return false, nil
+					}
+					return true, typeBinds
+				}
+			}
+			expt := types.Type(targs[0])
+			for j, param := range params[i:] {
+				ok, err := f.interpret.canConvertType(param.T, expt)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "%v: %v\n", f.name, err)
+					return false, nil
+				}
+				if !ok {
+					fmt.Fprintf(os.Stderr, "%v: incorrect type of parameter %v: expected %v, found %v\n", f.name, i+j, expt, param.T)
+					return false, nil
+				}
+			}
+			return true, typeBinds
+		}
+		if i >= len(params) {
+			return false, nil
+		}
 		param := params[i]
 		match, err := f.interpret.matchType(arg.T, param.T, &typeBinds)
 		if err != nil {
@@ -856,6 +907,9 @@ func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []types.Value) (r
 			}
 		}
 		binds[arg.Name] = param.E
+	}
+	if len(argfmt.Args) != len(params) {
+		return false, nil
 	}
 	return true, typeBinds
 }

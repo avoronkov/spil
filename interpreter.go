@@ -77,6 +77,7 @@ func NewInterpreter(w io.Writer, libraryDir string) *Interpret {
 		types.TypeBool:    types.TypeAny,
 		types.TypeFunc:    types.TypeAny,
 		"list[a]":         types.TypeAny,
+		"args[a]":         "list[a]",
 	}
 	i.typeAliases = map[types.Type]types.Type{
 		types.TypeList: "list[any]",
