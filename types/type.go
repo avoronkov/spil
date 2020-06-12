@@ -8,6 +8,7 @@ const (
 	TypeUnknown Type = "unknown"
 	TypeAny     Type = "any"
 	TypeInt     Type = "int"
+	TypeFloat   Type = "float"
 	TypeStr     Type = "str"
 	TypeBool    Type = "bool"
 	TypeFunc    Type = "func"

@@ -14,29 +14,24 @@ var (
 	UnexpectedEOF = errors.New("Unexpected EOF")
 )
 
-type IntParser interface {
+type NumberParser interface {
 	ParseInt(token string) (types.Int, bool)
-}
-
-type IntParserFn func(token string) (types.Int, bool)
-
-func (f IntParserFn) ParseInt(token string) (types.Int, bool) {
-	return f(token)
+	ParseFloat(token string) (types.Float, bool)
 }
 
 type Parser struct {
 	scanner *bufio.Scanner
 	tokens  []string
 
-	intParser IntParser
+	numberParser NumberParser
 }
 
-func NewParser(r io.Reader, intParser IntParser) *Parser {
+func NewParser(r io.Reader, numberParser NumberParser) *Parser {
 	scanner := bufio.NewScanner(r)
 	scanner.Split(bufio.ScanLines)
 	return &Parser{
-		scanner:   scanner,
-		intParser: intParser,
+		scanner:      scanner,
+		numberParser: numberParser,
 	}
 }
 
@@ -52,18 +47,7 @@ func (p *Parser) NextExpr() (*types.Value, error) {
 		}
 		return item, nil
 	}
-	if token == "'T" || token == "'F" || token == "true" || token == "false" {
-		v := token == "'T" || token == "true"
-		return &types.Value{E: types.Bool(v), T: types.TypeBool}, nil
-	}
-	if n, ok := p.intParser.ParseInt(token); ok {
-		return &types.Value{E: n, T: types.TypeInt}, nil
-	}
-	if s, err := types.ParseString(token); err == nil {
-		return &types.Value{E: s, T: types.TypeStr}, nil
-	}
-	// TODO
-	return &types.Value{E: types.Ident(token), T: types.TypeUnknown}, nil
+	return p.tokenParam(token), nil
 }
 
 func (p *Parser) nextSexpr(leftBrace string, quoted bool) (*types.Value, error) {
@@ -103,8 +87,11 @@ func (p *Parser) tokenParam(token string) *types.Value {
 		v := token == "'T" || token == "true"
 		return &types.Value{E: types.Bool(v), T: types.TypeBool}
 	}
-	if n, ok := p.intParser.ParseInt(token); ok {
+	if n, ok := p.numberParser.ParseInt(token); ok {
 		return &types.Value{E: n, T: types.TypeInt}
+	}
+	if n, ok := p.numberParser.ParseFloat(token); ok {
+		return &types.Value{E: n, T: types.TypeFloat}
 	}
 	if s, err := types.ParseString(token); err == nil {
 		return &types.Value{E: s, T: types.TypeStr}
@@ -191,4 +178,24 @@ func (p *Parser) prepareTokens() error {
 	}
 	p.tokens = tokens
 	return nil
+}
+
+type defaultNumberParser struct{}
+
+func (defaultNumberParser) ParseInt(token string) (types.Int, bool) {
+	return types.Int64Maker{}.ParseInt(token)
+}
+
+func (defaultNumberParser) ParseFloat(token string) (types.Float, bool) {
+	return types.Float64Maker{}.ParseFloat(token)
+}
+
+type bigNumberParser struct{}
+
+func (bigNumberParser) ParseInt(token string) (types.Int, bool) {
+	return types.BigIntMaker{}.ParseInt(token)
+}
+
+func (bigNumberParser) ParseFloat(token string) (types.Float, bool) {
+	return types.Float64Maker{}.ParseFloat(token)
 }

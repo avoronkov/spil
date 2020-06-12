@@ -13,9 +13,9 @@
 
 
 ;; split string into lazy list of words
-(def words (str:str) :list  (gen  \(next-string space _1) str))
-(def words' (str:str) :list (gen' \(next-string space _1) str))
+(def words (str:str) :list[str]  (gen  \(next-string space _1) str) :list[str])
+(def words' (str:str) :list[str] (gen' \(next-string space _1) str) :list[str])
 
 ;; split string into lazy list of lines
-(def lines (str:str) :list  (gen  \(next-string eol _1) str))
-(def lines' (str:str) :list (gen' \(next-string eol _1) str))
+(def lines (str:str) :list[str]  (gen  \(next-string eol _1) str) :list[str])
+(def lines' (str:str) :list[str] (gen' \(next-string eol _1) str) :list[str])

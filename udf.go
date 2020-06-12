@@ -128,13 +128,15 @@ func (f *FuncInterpret) TryBindAll(params []types.Value) (rt types.Type, err err
 			t := im.returnType.Expand(tps)
 			if rtDefined {
 				if t != rt {
-					return "", fmt.Errorf("%v: different implmentations returns different type: %v != %v", f.name, rt, t)
+					rt = types.TypeAny
+					f.genericReturnTypes[hash] = rt
+					// fmt.Fprintf(os.Stderr, "%v: different implmentations returns different type: %v != %v", f.name, rt, t)
 				}
 			} else {
 				f.genericReturnTypes[hash] = t
 				rtDefined = true
+				rt = t
 			}
-			rt = t
 			if len(tps) > 0 {
 				// check that generics are matching
 				values := make(map[string](types.Type))
@@ -421,11 +423,7 @@ L:
 
 func (f *FuncRuntime) lastParameter(e *types.Value) (*types.Value, *types.Type, error) {
 	switch a := e.E.(type) {
-	case types.Int:
-		return e, nil, nil
-	case types.Str:
-		return e, nil, nil
-	case types.Bool:
+	case types.Int, types.Float, types.Str, types.Bool:
 		return e, nil, nil
 	case types.Ident:
 		result := e
@@ -858,14 +856,14 @@ func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []types.Value) (r
 				}
 			}
 			expt := types.Type(targs[0])
-			for j, param := range params[i:] {
+			for _, param := range params[i:] {
 				ok, err := f.interpret.canConvertType(param.T, expt)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "%v: %v\n", f.name, err)
 					return false, nil
 				}
 				if !ok {
-					fmt.Fprintf(os.Stderr, "%v: incorrect type of parameter %v: expected %v, found %v\n", f.name, i+j, expt, param.T)
+					// fmt.Fprintf(os.Stderr, "%v: incorrect type of parameter %v: expected %v, found %v\n", f.name, i+j, expt, param.T)
 					return false, nil
 				}
 			}

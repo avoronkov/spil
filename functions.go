@@ -46,69 +46,39 @@ func EvalerFunc(name string, fn func([]types.Value) (*types.Value, error), binde
 	}
 }
 
-func FPlus(args []types.Value) (*types.Value, error) {
-	var result types.Int
-	for i, arg := range args {
-		a, ok := arg.E.(types.Int)
-		if !ok {
-			return nil, fmt.Errorf("FPlus: expected integer argument, found %v", arg)
+func MakeIntOperation(name string, op func(x, y types.Int) types.Int) func([]types.Value) (*types.Value, error) {
+	return func(args []types.Value) (*types.Value, error) {
+		var result types.Int
+		for i, arg := range args {
+			a, ok := arg.E.(types.Int)
+			if !ok {
+				return nil, fmt.Errorf("%v: expected integer argument, found %v", name, arg)
+			}
+			if i == 0 {
+				result = a
+			} else {
+				result = op(result, a)
+			}
 		}
-		if i == 0 {
-			result = a
-		} else {
-			result = result.Plus(a)
-		}
+		return &types.Value{E: result, T: types.TypeInt}, nil
 	}
-	return &types.Value{E: result, T: types.TypeInt}, nil
 }
 
-func FMinus(args []types.Value) (*types.Value, error) {
-	var result types.Int
-	for i, arg := range args {
-		a, ok := arg.E.(types.Int)
-		if !ok {
-			return nil, fmt.Errorf("FMinus: expected integer argument in position %v, found %v", i, arg)
-		}
-		if i == 0 {
-			result = a
-		} else {
-			result = result.Minus(a)
-		}
-	}
-	return &types.Value{E: result, T: types.TypeInt}, nil
-}
+var FPlus = MakeIntOperation("+", func(x, y types.Int) types.Int {
+	return x.Plus(y)
+})
 
-func FMultiply(args []types.Value) (*types.Value, error) {
-	var result types.Int
-	for i, arg := range args {
-		a, ok := arg.E.(types.Int)
-		if !ok {
-			return nil, fmt.Errorf("FMultiply: expected integer argument, found %v", arg)
-		}
-		if i == 0 {
-			result = a
-		} else {
-			result = result.Mult(a)
-		}
-	}
-	return &types.Value{E: result, T: types.TypeInt}, nil
-}
+var FMinus = MakeIntOperation("-", func(x, y types.Int) types.Int {
+	return x.Minus(y)
+})
 
-func FDiv(args []types.Value) (*types.Value, error) {
-	var result types.Int
-	for i, arg := range args {
-		a, ok := arg.E.(types.Int)
-		if !ok {
-			return nil, fmt.Errorf("FMultiply: expected integer argument, found %v", arg)
-		}
-		if i == 0 {
-			result = a
-		} else {
-			result = result.Div(a)
-		}
-	}
-	return &types.Value{E: result, T: types.TypeInt}, nil
-}
+var FMultiply = MakeIntOperation("*", func(x, y types.Int) types.Int {
+	return x.Mult(y)
+})
+
+var FDiv = MakeIntOperation("/", func(x, y types.Int) types.Int {
+	return x.Div(y)
+})
 
 func FMod(args []types.Value) (*types.Value, error) {
 	if len(args) != 2 {
@@ -124,6 +94,39 @@ func FMod(args []types.Value) (*types.Value, error) {
 	}
 	return &types.Value{E: a.Mod(b), T: types.TypeInt}, nil
 }
+
+func MakeFloatOperation(name string, op func(x, y types.Float) types.Float) func([]types.Value) (*types.Value, error) {
+	return func(args []types.Value) (*types.Value, error) {
+		var result types.Float
+		for i, arg := range args {
+			a, ok := arg.E.(types.Float)
+			if !ok {
+				return nil, fmt.Errorf("%v: expected float argument, found %v", name, arg)
+			}
+			if i == 0 {
+				result = a
+			} else {
+				result = op(result, a)
+			}
+		}
+		return &types.Value{E: result, T: types.TypeFloat}, nil
+	}
+}
+
+var FloatPlus = MakeFloatOperation("+", func(x, y types.Float) types.Float {
+	return x.Plus(y)
+})
+
+var FloatMinus = MakeFloatOperation("-", func(x, y types.Float) types.Float {
+	return x.Minus(y)
+})
+
+var FloatMult = MakeFloatOperation("*", func(x, y types.Float) types.Float {
+	return x.Mult(y)
+})
+var FloatDiv = MakeFloatOperation("/", func(x, y types.Float) types.Float {
+	return x.Div(y)
+})
 
 func FIntLess(args []types.Value) (*types.Value, error) {
 	if len(args) != 2 {
@@ -153,6 +156,21 @@ func FStrLess(args []types.Value) (*types.Value, error) {
 		return nil, fmt.Errorf("FStrLess: second argument should be string, found %v", args[1])
 	}
 	return &types.Value{E: types.Bool(string(a) < string(b)), T: types.TypeBool}, nil
+}
+
+func FFloatLess(args []types.Value) (*types.Value, error) {
+	if len(args) != 2 {
+		return nil, fmt.Errorf("FFloatLess: expected 2 arguments, found %v", args)
+	}
+	a, ok := args[0].E.(types.Float)
+	if !ok {
+		return nil, fmt.Errorf("FFloatLess: first argument should be float, found %v", args[0])
+	}
+	b, ok := args[1].E.(types.Float)
+	if !ok {
+		return nil, fmt.Errorf("FFloatLess: second argument should be float, found %v", args[1])
+	}
+	return &types.Value{E: types.Bool(a.Less(b)), T: types.TypeBool}, nil
 }
 
 func FEq(args []types.Value) (*types.Value, error) {

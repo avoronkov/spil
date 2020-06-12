@@ -28,7 +28,8 @@ type Interpret struct {
 	PluginDir   string
 	IncludeDirs []string
 
-	intMaker types.IntMaker
+	intMaker   types.IntMaker
+	floatMaker types.FloatMaker
 
 	lambdaCount int
 
@@ -42,15 +43,20 @@ func NewInterpreter(w io.Writer, libraryDir string) *Interpret {
 		output:       w,
 		libraryDir:   libraryDir,
 		intMaker:     &types.Int64Maker{},
+		floatMaker:   &types.Float64Maker{},
 		funcsOrigins: make(map[string]string),
 		contracts:    make(map[types.Type]struct{}),
 	}
 	i.funcs = map[string]types.Function{
-		"+":               EvalerFunc("+", FPlus, i.AllInts, types.TypeInt),
-		"-":               EvalerFunc("-", FMinus, i.AllInts, types.TypeInt),
-		"*":               EvalerFunc("*", FMultiply, i.AllInts, types.TypeInt),
-		"/":               EvalerFunc("/", FDiv, i.AllInts, types.TypeInt),
+		"int.plus":        EvalerFunc("+", FPlus, AnyArgs, types.TypeInt),
+		"int.minus":       EvalerFunc("-", FMinus, AnyArgs, types.TypeInt),
+		"int.mult":        EvalerFunc("*", FMultiply, AnyArgs, types.TypeInt),
+		"int.div":         EvalerFunc("/", FDiv, AnyArgs, types.TypeInt),
 		"mod":             EvalerFunc("mod", FMod, i.TwoInts, types.TypeInt),
+		"float.plus":      EvalerFunc("+", FloatPlus, AnyArgs, types.TypeFloat),
+		"float.minus":     EvalerFunc("-", FloatMinus, AnyArgs, types.TypeFloat),
+		"float.mult":      EvalerFunc("*", FloatMult, AnyArgs, types.TypeFloat),
+		"float.div":       EvalerFunc("/", FloatDiv, AnyArgs, types.TypeFloat),
 		"native.int.less": EvalerFunc("native.int.less", FIntLess, i.TwoInts, types.TypeBool),
 		"native.str.less": EvalerFunc("native.str.less", FStrLess, i.TwoStrs, types.TypeBool),
 		"=":               EvalerFunc("=", FEq, TwoArgs, types.TypeBool),
@@ -73,6 +79,7 @@ func NewInterpreter(w io.Writer, libraryDir string) *Interpret {
 		types.TypeUnknown: "",
 		types.TypeAny:     "",
 		types.TypeInt:     types.TypeAny,
+		types.TypeFloat:   types.TypeAny,
 		types.TypeStr:     "list[str]",
 		types.TypeBool:    types.TypeAny,
 		types.TypeFunc:    types.TypeAny,
@@ -127,6 +134,10 @@ func (i *Interpret) loadLibrary(dir string) error {
 
 func (i *Interpret) ParseInt(token string) (types.Int, bool) {
 	return i.intMaker.ParseInt(token)
+}
+
+func (i *Interpret) ParseFloat(token string) (types.Float, bool) {
+	return i.floatMaker.ParseFloat(token)
 }
 
 func (i *Interpret) parse(file string, input io.Reader) error {
@@ -727,14 +738,14 @@ func (i *Interpret) exprType(fname string, e types.Value, vars map[string]types.
 			if err != nil {
 				return u, err
 			}
-			if ftype != types.TypeFunc {
+			if ftype.Basic() != "func" {
 				return u, fmt.Errorf("%v: apply expects function on first place, found: %v", fname, a.List[1])
 			}
 			atype, err := i.exprType(fname, a.List[2], vars)
 			if err != nil {
 				return u, err
 			}
-			if atype.Basic() != "list" && atype != types.TypeUnknown {
+			if atype.Basic() != "list" && atype.Basic() != "args" && atype != types.TypeUnknown {
 				return u, fmt.Errorf("%v: apply expects list on second place, found: %v (%v)", fname, a.List[2], atype)
 			}
 			fi, ok := i.funcs[string(a.List[1].E.(types.Ident))]
@@ -851,7 +862,7 @@ func (i *Interpret) exprType(fname string, e types.Value, vars map[string]types.
 			params := []types.Value{}
 			for _, item := range a.List[1:] {
 				switch a := item.E.(type) {
-				case types.Int, types.Str, types.Bool:
+				case types.Int, types.Float, types.Str, types.Bool:
 					params = append(params, item)
 				case *types.Sexpr:
 					if a.Empty() || a.Quoted {
