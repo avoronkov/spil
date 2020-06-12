@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"unicode"
 
@@ -127,6 +128,35 @@ var FloatMult = MakeFloatOperation("*", func(x, y types.Float) types.Float {
 var FloatDiv = MakeFloatOperation("/", func(x, y types.Float) types.Float {
 	return x.Div(y)
 })
+
+func FIntToFloat(args []types.Value) (*types.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("FIntToFloat: expected 1 argument, found %v", args)
+	}
+	a, ok := args[0].E.(types.Int)
+	if !ok {
+		return nil, fmt.Errorf("FIntToFloat: first argument should be integer, found %v", args[0])
+	}
+
+	f := float64(a.Int64())
+	return &types.Value{E: types.Float64(f), T: types.TypeFloat}, nil
+}
+
+func FStrToFloat(args []types.Value) (*types.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("FStrToFloat: expected 1 argument, found %v", args)
+	}
+	a, ok := args[0].E.(types.Str)
+	if !ok {
+		return nil, fmt.Errorf("FStrToFloat: first argument should be integer, found %v", args[0])
+	}
+
+	f, ok := types.Float64Maker{}.ParseFloat(string(a))
+	if !ok {
+		return nil, fmt.Errorf("FStrToFloat: cannot convert value into float: %v", a)
+	}
+	return &types.Value{E: f, T: types.TypeFloat}, nil
+}
 
 func FIntLess(args []types.Value) (*types.Value, error) {
 	if len(args) != 2 {
@@ -313,6 +343,20 @@ type Lenghter interface {
 
 type Nther interface {
 	Nth(n int) (*types.Value, error)
+}
+
+// math
+
+func FSin(args []types.Value) (*types.Value, error) {
+	arg := float64(args[0].E.(types.Float64))
+	res := math.Sin(arg)
+	return &types.Value{E: types.Float64(res), T: types.TypeFloat}, nil
+}
+
+func FCos(args []types.Value) (*types.Value, error) {
+	arg := float64(args[0].E.(types.Float64))
+	res := math.Cos(arg)
+	return &types.Value{E: types.Float64(res), T: types.TypeFloat}, nil
 }
 
 // Binders

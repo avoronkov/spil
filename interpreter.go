@@ -48,32 +48,38 @@ func NewInterpreter(w io.Writer) *Interpret {
 		contracts:    make(map[types.Type]struct{}),
 	}
 	i.funcs = map[string]types.Function{
-		"int.plus":        EvalerFunc("+", FPlus, AnyArgs, types.TypeInt),
-		"int.minus":       EvalerFunc("-", FMinus, AnyArgs, types.TypeInt),
-		"int.mult":        EvalerFunc("*", FMultiply, AnyArgs, types.TypeInt),
-		"int.div":         EvalerFunc("/", FDiv, AnyArgs, types.TypeInt),
-		"mod":             EvalerFunc("mod", FMod, i.TwoInts, types.TypeInt),
-		"float.plus":      EvalerFunc("+", FloatPlus, AnyArgs, types.TypeFloat),
-		"float.minus":     EvalerFunc("-", FloatMinus, AnyArgs, types.TypeFloat),
-		"float.mult":      EvalerFunc("*", FloatMult, AnyArgs, types.TypeFloat),
-		"float.div":       EvalerFunc("/", FloatDiv, AnyArgs, types.TypeFloat),
-		"native.int.less": EvalerFunc("native.int.less", FIntLess, i.TwoInts, types.TypeBool),
-		"native.str.less": EvalerFunc("native.str.less", FStrLess, i.TwoStrs, types.TypeBool),
-		"=":               EvalerFunc("=", FEq, TwoArgs, types.TypeBool),
-		"not":             EvalerFunc("not", FNot, i.OneBoolArg, types.TypeBool),
-		"print":           EvalerFunc("print", i.FPrint, AnyArgs, types.TypeAny),
-		"native.head":     EvalerFunc("native.head", FHead, AnyArgs, types.TypeAny),
-		"native.tail":     EvalerFunc("native.tail", FTail, AnyArgs, types.TypeList),
-		"append":          EvalerFunc("append", FAppend, i.AppenderArgs, types.TypeList),
-		"list":            EvalerFunc("list", FList, AnyArgs, types.TypeList),
-		"space":           EvalerFunc("space", FSpace, i.StrArg, types.TypeBool),
-		"eol":             EvalerFunc("eol", FEol, i.StrArg, types.TypeBool),
-		"empty":           EvalerFunc("empty", FEmpty, i.ListArg, types.TypeBool),
-		"native.length":   EvalerFunc("native.length", i.FLength, i.ListArg, types.TypeInt),
-		"native.nth":      EvalerFunc("native.nth", i.FNth, i.IntAndListArgs, types.TypeAny),
-		"int":             EvalerFunc("int", i.FInt, i.StrArg, types.TypeInt),
-		"open":            EvalerFunc("open", FOpen, i.StrArg, types.TypeStr),
-		"type":            EvalerFunc("type", FType, SingleArg, types.TypeStr),
+		"int.plus":      EvalerFunc("+", FPlus, AnyArgs, types.TypeInt),
+		"int.minus":     EvalerFunc("-", FMinus, AnyArgs, types.TypeInt),
+		"int.mult":      EvalerFunc("*", FMultiply, AnyArgs, types.TypeInt),
+		"int.div":       EvalerFunc("/", FDiv, AnyArgs, types.TypeInt),
+		"mod":           EvalerFunc("mod", FMod, i.TwoInts, types.TypeInt),
+		"float.plus":    EvalerFunc("+", FloatPlus, AnyArgs, types.TypeFloat),
+		"float.minus":   EvalerFunc("-", FloatMinus, AnyArgs, types.TypeFloat),
+		"float.mult":    EvalerFunc("*", FloatMult, AnyArgs, types.TypeFloat),
+		"float.div":     EvalerFunc("/", FloatDiv, AnyArgs, types.TypeFloat),
+		"math.sin":      EvalerFunc("math.sin", FSin, AnyArgs, types.TypeFloat),
+		"math.cos":      EvalerFunc("math.cos", FCos, AnyArgs, types.TypeFloat),
+		"int.less":      EvalerFunc("int.less", FIntLess, i.TwoInts, types.TypeBool),
+		"str.less":      EvalerFunc("str.less", FStrLess, i.TwoStrs, types.TypeBool),
+		"float.less":    EvalerFunc("float.less", FFloatLess, AnyArgs, types.TypeBool),
+		"=":             EvalerFunc("=", FEq, TwoArgs, types.TypeBool),
+		"not":           EvalerFunc("not", FNot, i.OneBoolArg, types.TypeBool),
+		"print":         EvalerFunc("print", i.FPrint, AnyArgs, types.TypeAny),
+		"native.head":   EvalerFunc("native.head", FHead, AnyArgs, types.TypeAny),
+		"native.tail":   EvalerFunc("native.tail", FTail, AnyArgs, types.TypeList),
+		"append":        EvalerFunc("append", FAppend, i.AppenderArgs, types.TypeList),
+		"list":          EvalerFunc("list", FList, AnyArgs, types.TypeList),
+		"space":         EvalerFunc("space", FSpace, i.StrArg, types.TypeBool),
+		"eol":           EvalerFunc("eol", FEol, i.StrArg, types.TypeBool),
+		"empty":         EvalerFunc("empty", FEmpty, i.ListArg, types.TypeBool),
+		"native.length": EvalerFunc("native.length", i.FLength, i.ListArg, types.TypeInt),
+		"native.nth":    EvalerFunc("native.nth", i.FNth, i.IntAndListArgs, types.TypeAny),
+		"strtoint":      EvalerFunc("strtoint", i.FStrToInt, i.StrArg, types.TypeInt),
+		"floattoint":    EvalerFunc("floattoint", i.FFloatToInt, AnyArgs, types.TypeInt),
+		"strtofloat":    EvalerFunc("strtofloat", FStrToFloat, AnyArgs, types.TypeFloat),
+		"inttofloat":    EvalerFunc("inttofloat", FIntToFloat, AnyArgs, types.TypeFloat),
+		"open":          EvalerFunc("open", FOpen, i.StrArg, types.TypeStr),
+		"type":          EvalerFunc("type", FType, SingleArg, types.TypeStr),
 	}
 	i.types = map[types.Type]types.Type{
 		types.TypeUnknown: "",
@@ -456,7 +462,7 @@ func (in *Interpret) FPrint(args []types.Value) (*types.Value, error) {
 }
 
 // convert string into int
-func (in *Interpret) FInt(args []types.Value) (*types.Value, error) {
+func (in *Interpret) FStrToInt(args []types.Value) (*types.Value, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("FInt: expected exaclty one argument, found %v", args)
 	}
@@ -468,6 +474,19 @@ func (in *Interpret) FInt(args []types.Value) (*types.Value, error) {
 	if !ok {
 		return nil, fmt.Errorf("FInt: cannot convert argument into Int: %v", s)
 	}
+	return &types.Value{E: i, T: types.TypeInt}, nil
+}
+
+// convert float into int
+func (in *Interpret) FFloatToInt(args []types.Value) (*types.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("FInt: expected exaclty one argument, found %v", args)
+	}
+	f, ok := args[0].E.(types.Float64)
+	if !ok {
+		return nil, fmt.Errorf("FInt: expected argument to be Float, found %v", args)
+	}
+	i := in.intMaker.MakeInt(int64(f))
 	return &types.Value{E: i, T: types.TypeInt}, nil
 }
 
@@ -682,11 +701,7 @@ var reArg = regexp.MustCompile(`^_[0-9]+$`)
 func (i *Interpret) exprType(fname string, e types.Value, vars map[string]types.Type) (result types.Type, err error) {
 	const u = types.TypeUnknown
 	switch a := e.E.(type) {
-	case types.Int:
-		return e.T, nil
-	case types.Str:
-		return e.T, nil
-	case types.Bool:
+	case types.Int, types.Float, types.Str, types.Bool:
 		return e.T, nil
 	case types.Ident:
 		if t, ok := vars[string(a)]; ok {
