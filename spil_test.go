@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -68,7 +67,7 @@ func checkInterpreter(t *testing.T, input, output string, bigint bool) {
 	}
 
 	buffer := &strings.Builder{}
-	in := NewInterpreter(buffer, getTestLibraryDir())
+	in := NewInterpreter(buffer)
 	in.UseBigInt(bigint)
 
 	inputPath, err := filepath.Abs(input)
@@ -92,9 +91,4 @@ func run(i *Interpret, file string, input io.Reader) error {
 		return fmt.Errorf("Check failed: %v", err)
 	}
 	return i.Run()
-}
-
-func getTestLibraryDir() string {
-	_, filename, _, _ := runtime.Caller(0)
-	return filepath.Join(filepath.Dir(filename), "library")
 }

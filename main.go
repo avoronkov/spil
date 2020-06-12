@@ -37,7 +37,7 @@ func doMain() int {
 		log.SetOutput(ioutil.Discard)
 	}
 
-	in := NewInterpreter(os.Stdout, getReleaseLibraryDir())
+	in := NewInterpreter(os.Stdout)
 	in.UseBigInt(bigint)
 	in.PluginDir = getReleasePluginDir()
 	in.IncludeDirs = []string{in.PluginDir}

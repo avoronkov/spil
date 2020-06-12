@@ -179,7 +179,7 @@ func TestMatchParameters(t *testing.T) {
 			true,
 		},
 	}
-	in := NewInterpreter(os.Stderr, getTestLibraryDir())
+	in := NewInterpreter(os.Stderr)
 	fi := NewFuncInterpret(in, "__test__")
 	in.types[types.Type("set")] = "list[any]"
 
@@ -218,7 +218,7 @@ func TestCanConvertType(t *testing.T) {
 		{"list[z]", "any", true},
 		{"list", "any", true},
 	}
-	in := NewInterpreter(os.Stderr, getTestLibraryDir())
+	in := NewInterpreter(os.Stderr)
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%v %v", test.from, test.to), func(t *testing.T) {
 			ok, err := in.canConvertType(test.from, test.to)
@@ -267,7 +267,7 @@ func TestMatchType(t *testing.T) {
 		{"func-func[a]", "func", "func[a]", emptyStringTypeMap(), true},
 	}
 
-	in := NewInterpreter(os.Stderr, getTestLibraryDir())
+	in := NewInterpreter(os.Stderr)
 	in.types["some[a,b]"] = types.TypeAny
 	in.types["set"] = "list[any]"
 	in.types["tset[a]"] = "list[a]"
@@ -306,7 +306,7 @@ func TestToParent(t *testing.T) {
 		{"intsome[str]->some", "intsome[str]", "some", "some[int,str]"},
 	}
 
-	in := NewInterpreter(os.Stderr, getTestLibraryDir())
+	in := NewInterpreter(os.Stderr)
 	in.types["some[a,b]"] = types.TypeAny
 	in.types["set"] = "list[any]"
 	in.types["tset[a]"] = "list[a]"

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/avoronkov/spil/library"
 	"github.com/avoronkov/spil/types"
 )
 
@@ -24,7 +26,6 @@ type Interpret struct {
 	// string->filepath map to control where function was initially defined.
 	funcsOrigins map[string]string
 
-	libraryDir  string
 	PluginDir   string
 	IncludeDirs []string
 
@@ -38,10 +39,9 @@ type Interpret struct {
 	main *FuncInterpret
 }
 
-func NewInterpreter(w io.Writer, libraryDir string) *Interpret {
+func NewInterpreter(w io.Writer) *Interpret {
 	i := &Interpret{
 		output:       w,
-		libraryDir:   libraryDir,
 		intMaker:     &types.Int64Maker{},
 		floatMaker:   &types.Float64Maker{},
 		funcsOrigins: make(map[string]string),
@@ -100,27 +100,16 @@ func (i *Interpret) UseBigInt(v bool) {
 	}
 }
 
-func (i *Interpret) loadLibrary(dir string) error {
-	files, err := filepath.Glob(filepath.Join(dir, "*.lisp"))
-	if err != nil {
-		return fmt.Errorf("Error while loading builtins: %w", err)
-	}
-	if len(files) == 0 {
-		return fmt.Errorf("Builtin source files not found in %v", dir)
-	}
-	for _, file := range files {
+func (i *Interpret) loadLibrary(name string) error {
+	foundFiles := false
+	prefix := fmt.Sprintf("library/%s/", name)
+	for _, file := range library.AssetNames() {
+		if !strings.HasPrefix(file, prefix) {
+			continue
+		}
 		err := func() error {
-			f, err := os.Open(file)
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-			absPath, err := filepath.Abs(file)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Cannot determine absolute path for %q: %e", file, err)
-				absPath = file
-			}
-			if err := i.parse(absPath, f); err != nil {
+			data := library.MustAsset(file)
+			if err := i.parse(file, bytes.NewReader(data)); err != nil {
 				return err
 			}
 			return nil
@@ -128,6 +117,10 @@ func (i *Interpret) loadLibrary(dir string) error {
 		if err != nil {
 			return fmt.Errorf("Error whire loading %v: %w", file, err)
 		}
+		foundFiles = true
+	}
+	if !foundFiles {
+		return fmt.Errorf("Library source files not found: %v", name)
 	}
 	return nil
 }
@@ -199,7 +192,7 @@ L:
 }
 
 func (i *Interpret) Parse(file string, input io.Reader) error {
-	if err := i.loadLibrary(filepath.Join(i.libraryDir, "builtin")); err != nil {
+	if err := i.loadLibrary("builtin"); err != nil {
 		return err
 	}
 
@@ -294,7 +287,7 @@ func (i *Interpret) use(args []types.Value) error {
 		case "bigmath":
 			i.UseBigInt(true)
 		case "std":
-			if err := i.loadLibrary(filepath.Join(i.libraryDir, "std")); err != nil {
+			if err := i.loadLibrary("std"); err != nil {
 				return err
 			}
 		case "strict":
