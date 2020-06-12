@@ -173,7 +173,7 @@ L:
 					continue L
 				case "use":
 					tail, _ := a.Tail()
-					if err := i.use(tail.(*types.Sexpr).List); err != nil {
+					if err := i.use(file, tail.(*types.Sexpr).List); err != nil {
 						return err
 					}
 					continue L
@@ -280,9 +280,9 @@ func (i *Interpret) defineFunc(file string, se *types.Sexpr, memo bool) error {
 	return nil
 }
 
-func (i *Interpret) use(args []types.Value) error {
-	if len(args) != 1 {
-		return fmt.Errorf("'use' expected one argument, found: %v", args)
+func (i *Interpret) use(file string, args []types.Value) error {
+	if len(args) < 1 {
+		return fmt.Errorf("'use' expects arguments, none found.")
 	}
 	module := args[0]
 	switch a := module.E.(type) {
@@ -298,9 +298,17 @@ func (i *Interpret) use(args []types.Value) error {
 			}
 		case "strict":
 			i.strictTypes = true
+		case "plugin":
+			if len(args) < 2 {
+				return fmt.Errorf("'use plugin' expects argument, none found")
+			}
+			name, ok := args[1].E.(types.Str)
+			if !ok {
+				return fmt.Errorf("'use plugin' expects string argument, found: %v", args[2])
+			}
+			return i.usePlugin(file, string(name))
 		default:
-			// try to load named plugin
-			return i.usePlugin(string(a))
+			return fmt.Errorf("Unexpected argument to 'use': %v", string(a))
 		}
 		return nil
 	}
@@ -326,12 +334,28 @@ func (in *Interpret) useModule(name string) error {
 	return fmt.Errorf("Module %v not found in %v", name, includeDirs)
 }
 
-func (in *Interpret) usePlugin(name string) error {
-	filename := filepath.Join(in.PluginDir, name+".so")
-	plug, err := plugin.Open(filename)
-	if err != nil {
-		return err
+func (in *Interpret) usePlugin(file, name string) (err error) {
+	var (
+		plug     *plugin.Plugin
+		filename string
+	)
+	fdir := filepath.Dir(file)
+	for _, dir := range []string{fdir, in.PluginDir} {
+		// search "someplug" in "$dir/someplug/someplug.so"
+		filename = filepath.Join(dir, name, name+".so")
+		plug, err = plugin.Open(filename)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		break
 	}
+	if plug == nil {
+		return fmt.Errorf("Plugin '%v' not found in directories: %v, %v", name, fdir, in.PluginDir)
+	}
+
 	sym, err := plug.Lookup("Types")
 	if err != nil {
 		return fmt.Errorf("Plugin %v does not define Types", filename)

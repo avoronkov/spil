@@ -10,11 +10,15 @@ import (
 	"path/filepath"
 )
 
+var version = "0.1.0"
+
 var (
-	trace  bool
-	bigint bool
-	stat   bool
-	check  bool
+	trace     bool
+	bigint    bool
+	stat      bool
+	check     bool
+	ver       bool
+	pluginDir string
 )
 
 func init() {
@@ -29,17 +33,27 @@ func init() {
 
 	flag.BoolVar(&check, "check", false, "make parsing and typechecking only")
 	flag.BoolVar(&check, "c", false, "make parsing and typechecking only (shorthand)")
+
+	flag.StringVar(&pluginDir, "plugin-dir", "", "plugins directory")
+	flag.StringVar(&pluginDir, "p", "", "plugins directory (shorthand)")
+
+	flag.BoolVar(&ver, "version", false, "show version")
+	flag.BoolVar(&ver, "v", false, "show version")
 }
 
 func doMain() int {
 	flag.Parse()
+	if ver {
+		showVersion()
+		return 0
+	}
 	if !trace {
 		log.SetOutput(ioutil.Discard)
 	}
 
 	in := NewInterpreter(os.Stdout)
 	in.UseBigInt(bigint)
-	in.PluginDir = getReleasePluginDir()
+	in.PluginDir = pluginDir
 	in.IncludeDirs = []string{in.PluginDir}
 
 	var file string
@@ -93,18 +107,6 @@ func main() {
 	os.Exit(doMain())
 }
 
-func getReleaseLibraryDir() string {
-	binPath, err := os.Executable()
-	if err != nil {
-		panic(fmt.Errorf("Cannot determine librabry dir: %v", err))
-	}
-	return filepath.Join(filepath.Dir(binPath), "library")
-}
-
-func getReleasePluginDir() string {
-	binPath, err := os.Executable()
-	if err != nil {
-		panic(fmt.Errorf("Cannot determine plugin dir: %v", err))
-	}
-	return filepath.Join(filepath.Dir(binPath), "plugins")
+func showVersion() {
+	fmt.Printf("SPIL version %v\n", version)
 }

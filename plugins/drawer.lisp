@@ -1,4 +1,4 @@
-(use drawer/drawer)
+(use plugin "drawer")
 
 ; RGB color
 (deftype :rgb :list[int])
