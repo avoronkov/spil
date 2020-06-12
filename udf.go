@@ -16,7 +16,6 @@ type FuncInterpret struct {
 	interpret    *Interpret
 	name         string
 	bodies       []*FuncImpl
-	returnType   types.Type
 	capturedVars map[string]*types.Value
 
 	genericReturnTypes map[string]types.Type
@@ -92,7 +91,6 @@ func NewFuncInterpret(i *Interpret, name string) *FuncInterpret {
 	return &FuncInterpret{
 		interpret:          i,
 		name:               name,
-		returnType:         types.TypeUnknown,
 		capturedVars:       make(map[string]*types.Value),
 		genericReturnTypes: make(map[string]types.Type),
 	}
@@ -100,9 +98,6 @@ func NewFuncInterpret(i *Interpret, name string) *FuncInterpret {
 
 func (f *FuncInterpret) AddImpl(argfmt types.Expr, body []types.Value, memo bool, returnType types.Type) error {
 	returnType = f.interpret.UnaliasType(returnType)
-	if len(f.bodies) > 0 && returnType != f.returnType {
-		return fmt.Errorf("%v: cannot redefine return type: previous %v, current %v", f.name, f.returnType, returnType)
-	}
 	if argfmt == nil {
 		f.bodies = append(f.bodies, NewFuncImpl(nil, body, memo, returnType))
 		return nil
@@ -113,7 +108,6 @@ func (f *FuncInterpret) AddImpl(argfmt types.Expr, body []types.Value, memo bool
 	}
 	f.bodies = append(f.bodies, NewFuncImpl(af, body, memo, returnType))
 
-	f.returnType = returnType
 	return nil
 }
 
@@ -198,10 +192,6 @@ func (f *FuncInterpret) Eval(params []types.Value) (result *types.Value, err err
 	}
 	res.T = newT
 	return res, err
-}
-
-func (f *FuncInterpret) ReturnType() types.Type {
-	return f.returnType
 }
 
 type FuncRuntime struct {

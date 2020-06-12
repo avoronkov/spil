@@ -566,7 +566,7 @@ func (i *Interpret) CheckReturnTypes() (errs []error) {
 
 		for _, impl := range fi.bodies {
 			if i.strictTypes {
-				if fi.returnType == types.TypeUnknown {
+				if impl.returnType == types.TypeUnknown {
 					err := fmt.Errorf("%v : %v: return type should be specified in strict mode", i.funcsOrigins[fi.name], fi.name)
 					errs = append(errs, err)
 				}
@@ -583,9 +583,9 @@ func (i *Interpret) CheckReturnTypes() (errs []error) {
 			if err != nil {
 				errs = append(errs, err)
 			}
-			if fi.returnType != types.TypeAny && fi.returnType != types.TypeUnknown && !i.IsGeneric(fi.returnType) {
-				if t != fi.returnType {
-					err := fmt.Errorf("Incorrect return value in function %v(%v): expected %v actual %v", fi.name, impl.argfmt, fi.returnType, t)
+			if impl.returnType != types.TypeUnknown && !i.IsGeneric(impl.returnType) {
+				if ok, err := i.canConvertType(t, impl.returnType); !ok || err != nil {
+					err := fmt.Errorf("Incorrect return value in function %v(%v): expected %v actual %v (%v)", fi.name, impl.argfmt, impl.returnType, t, err)
 					errs = append(errs, err)
 				}
 			}
