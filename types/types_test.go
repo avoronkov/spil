@@ -28,9 +28,12 @@ func TestArguments(t *testing.T) {
 		arg Type
 		exp []string
 	}{
-		{":int", nil},
-		{":list[a]", []string{"a"}},
-		{":list[a,b,c]", []string{"a", "b", "c"}},
+		{"int", nil},
+		{"list[a]", []string{"a"}},
+		{"list[a,b,c]", []string{"a", "b", "c"}},
+		{"list[a,list[any]]", []string{"a", "list[any]"}},
+		{"list[a,some[b,c]]", []string{"a", "some[b,c]"}},
+		{"list[a,some[b,c],some[some[d,e]],f]", []string{"a", "some[b,c]", "some[some[d,e]]", "f"}},
 	}
 	for _, test := range tests {
 		t.Run(string(test.arg), func(t *testing.T) {

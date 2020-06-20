@@ -170,7 +170,7 @@ func (f *FuncInterpret) TryBind(params []types.Value) (num int, rt types.Type, t
 			return idx, t, tps, nil
 		}
 	}
-	return -1, types.TypeUnknown, nil, fmt.Errorf("%v: no matching function implementation found for %v", f.name, params)
+	return -1, types.TypeUnknown, nil, fmt.Errorf("%v: TryBind: no matching function implementation found for %v", f.name, params)
 }
 
 func (f *FuncInterpret) Eval(params []types.Value) (result *types.Value, err error) {
@@ -857,7 +857,7 @@ func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []types.Value) (r
 			}
 			expt := types.Type(targs[0])
 			for _, param := range params[i:] {
-				ok, err := f.interpret.canConvertType(param.T, expt)
+				ok, err := f.interpret.matchType(expt, param.T, &typeBinds)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "%v: %v\n", f.name, err)
 					return false, nil

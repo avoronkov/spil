@@ -161,6 +161,12 @@ func TestMatchParameters(t *testing.T) {
 			true,
 		},
 		{
+			":a :list[a] vs :list :list[list[any]]",
+			MakeArgFmt(Arg{Name: "elem", T: "a"}, Arg{Name: "lst", T: "list[a]"}),
+			[]types.Value{{T: types.TypeList}, {T: "list[list[any]]"}},
+			true,
+		},
+		{
 			":a :list[a] vs :int :list[any]",
 			MakeArgFmt(Arg{Name: "elem", T: "a"}, Arg{Name: "lst", T: "list[a]"}),
 			[]types.Value{{T: types.TypeInt}, {T: "list[any]"}},
@@ -191,7 +197,7 @@ func TestMatchParameters(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			act, _ := fi.matchParameters(test.argfmt, test.args)
 			if act != test.exp {
-				t.Errorf("Incorrect matchArgs(%v, %v) != %v", test.argfmt, test.args, test.exp)
+				t.Errorf("Incorrect matchParameters(%v, %v) != %v", test.argfmt, test.args, test.exp)
 			}
 		})
 	}
@@ -265,6 +271,7 @@ func TestMatchType(t *testing.T) {
 		{"list[a]-list[any]", "list[a]", "list[any]", emptyStringTypeMap(), true},
 		{"func[a]-func", "func[a]", "func", emptyStringTypeMap(), true},
 		{"func-func[a]", "func", "func[a]", emptyStringTypeMap(), true},
+		{"list[a]-list[list[a]]", "list[a]", "list[list[any]]", &map[string]types.Type{"a": "list[any]"}, true},
 	}
 
 	in := NewInterpreter(os.Stderr)

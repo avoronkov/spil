@@ -41,8 +41,30 @@ func (t Type) Arguments() []string {
 	if l < 0 {
 		return nil
 	}
-	s := strings.TrimRight(string(t)[l+1:], "]")
-	return strings.Split(s, ",")
+	s := string(t)[l+1 : len(t)-1]
+	return splitArguments(s)
+}
+
+func splitArguments(argStr string) (args []string) {
+	start := 0
+	braces := 0
+	for i := 0; i < len(argStr); i++ {
+		switch c := argStr[i]; c {
+		case ',':
+			if braces == 0 {
+				args = append(args, argStr[start:i])
+				start = i + 1
+			}
+		case '[':
+			braces++
+		case ']':
+			braces--
+		}
+	}
+	if start < len(argStr) {
+		args = append(args, argStr[start:])
+	}
+	return
 }
 
 // ":x[int,str,list]" -> "x[a,b,c]"
