@@ -73,7 +73,7 @@ func TestNextExpr(t *testing.T) {
 				numberParser = bigNumberParser{}
 			}
 			p := NewParser(strings.NewReader(test.input), numberParser)
-			res, err := p.NextExpr()
+			res, err := p.NextExpr(false)
 			if err != nil {
 				t.Fatal(err)
 			}

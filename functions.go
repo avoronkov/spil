@@ -332,7 +332,7 @@ func FOpen(args []types.Value) (*types.Value, error) {
 
 func FType(args []types.Value) (*types.Value, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf(": expected exaclty one argument, found %v", args)
+		return nil, fmt.Errorf("type: expected exaclty one argument, found %v", args)
 	}
 	return &types.Value{E: types.Str(args[0].T.String()), T: types.TypeStr}, nil
 }

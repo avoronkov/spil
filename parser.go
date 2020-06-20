@@ -35,13 +35,13 @@ func NewParser(r io.Reader, numberParser NumberParser) *Parser {
 	}
 }
 
-func (p *Parser) NextExpr() (*types.Value, error) {
+func (p *Parser) NextExpr(quoted bool) (*types.Value, error) {
 	token, err := p.nextToken()
 	if err != nil {
 		return nil, err
 	}
 	if token == "(" || token == "'(" || token == "\\(" {
-		item, err := p.nextSexpr(token, token == "'(")
+		item, err := p.nextSexpr(token, quoted || token == "'(")
 		if err != nil {
 			return nil, err
 		}

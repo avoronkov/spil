@@ -80,6 +80,7 @@ func NewInterpreter(w io.Writer) *Interpret {
 		"inttofloat":    EvalerFunc("inttofloat", FIntToFloat, AnyArgs, types.TypeFloat),
 		"open":          EvalerFunc("open", FOpen, i.StrArg, types.TypeStr),
 		"type":          EvalerFunc("type", FType, SingleArg, types.TypeStr),
+		"parse":         EvalerFunc("parse", i.FParse, i.StrArg, types.TypeList),
 	}
 	i.types = map[types.Type]types.Type{
 		types.TypeUnknown: "",
@@ -143,7 +144,7 @@ func (i *Interpret) parse(file string, input io.Reader) error {
 	parser := NewParser(input, i)
 L:
 	for {
-		val, err := parser.NextExpr()
+		val, err := parser.NextExpr(false)
 		if err == io.EOF {
 			break L
 		}
@@ -568,6 +569,35 @@ func (in *Interpret) FNth(args []types.Value) (*types.Value, error) {
 		n--
 	}
 	return a.Head()
+}
+
+func (in *Interpret) FParse(args []types.Value) (*types.Value, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("FParse: expected exaclty one argument, found %v", args)
+	}
+	var input io.Reader
+	s, ok := args[0].E.(types.Str)
+	if ok {
+		input = strings.NewReader(string(s))
+	} else if li, ok := args[0].E.(*LazyInput); ok {
+		// TODO make non-destructing reading from lazy input
+		input = li.input
+	} else {
+		return nil, fmt.Errorf("FParse: expected string argument, found %v", args)
+	}
+	parser := NewParser(input, in)
+	list := &types.Sexpr{Quoted: true}
+	for {
+		val, err := parser.NextExpr(true)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		list.List = append(list.List, *val)
+	}
+	return &types.Value{T: types.TypeList, E: list}, nil
 }
 
 func (in *Interpret) NewLambdaName() (name string) {
