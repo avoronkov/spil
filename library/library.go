@@ -89,7 +89,7 @@ func libraryBuiltinListLisp() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "library/builtin/list.lisp", size: 294, mode: os.FileMode(436), modTime: time.Unix(1591971849, 0)}
+	info := bindataFileInfo{name: "library/builtin/list.lisp", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -109,7 +109,7 @@ func libraryBuiltinNumbersLisp() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "library/builtin/numbers.lisp", size: 723, mode: os.FileMode(436), modTime: time.Unix(1591984751, 0)}
+	info := bindataFileInfo{name: "library/builtin/numbers.lisp", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -129,7 +129,7 @@ func libraryBuiltinOrderLisp() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "library/builtin/order.lisp", size: 641, mode: os.FileMode(436), modTime: time.Unix(1591984751, 0)}
+	info := bindataFileInfo{name: "library/builtin/order.lisp", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -149,7 +149,7 @@ func libraryStdBuiltinLisp() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "library/std/builtin.lisp", size: 2818, mode: os.FileMode(436), modTime: time.Unix(1591971849, 0)}
+	info := bindataFileInfo{name: "library/std/builtin.lisp", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -169,7 +169,7 @@ func libraryStdMathLisp() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "library/std/math.lisp", size: 80, mode: os.FileMode(436), modTime: time.Unix(1591984751, 0)}
+	info := bindataFileInfo{name: "library/std/math.lisp", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -189,7 +189,7 @@ func libraryStdNumericLisp() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "library/std/numeric.lisp", size: 75, mode: os.FileMode(436), modTime: time.Unix(1591971849, 0)}
+	info := bindataFileInfo{name: "library/std/numeric.lisp", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -209,7 +209,7 @@ func libraryStdStringLisp() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "library/std/string.lisp", size: 860, mode: os.FileMode(436), modTime: time.Unix(1591971849, 0)}
+	info := bindataFileInfo{name: "library/std/string.lisp", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
