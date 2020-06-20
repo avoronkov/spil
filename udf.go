@@ -859,7 +859,7 @@ func (f *FuncInterpret) matchParameters(argfmt *ArgFmt, params []types.Value) (r
 			for _, param := range params[i:] {
 				ok, err := f.interpret.matchType(expt, param.T, &typeBinds)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "%v: %v\n", f.name, err)
+					// fmt.Fprintf(os.Stderr, "%v: %v\n", f.name, err)
 					return false, nil
 				}
 				if !ok {
