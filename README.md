@@ -378,3 +378,7 @@ You can find some examples of code [in this repository](https://github.com/avoro
 - [ ] Forbidden matching (:delete or something)
 
 - [ ] Type of variable is vanished when placed into list.
+
+- [ ] Handle multiple uses of the same library
+
+- [ ] Implement `const` for global constants
